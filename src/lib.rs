@@ -12,7 +12,7 @@ mod lisp{
     #[derive(Debug, Clone)]
     pub enum Type{
         Int(i32),
-        Atom(String),
+        Atom(Box<String>), // Typeをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Boxingする
         LispList(Box<LispList>)
     }
 
@@ -28,6 +28,7 @@ mod lisp{
         }
 
         fn push_front(&self, tp : Type) -> LispList {
+            
             return LispList::Cons(tp, Box::new(self.clone()));
         }
 
@@ -141,7 +142,7 @@ mod lisp{
                     break;
                 }
             }
-            return Type::Atom(atom);
+            return Type::Atom(Box::new(atom));
         }
 
         return Type::Int(0);
@@ -157,12 +158,12 @@ mod tests {
         use super::lisp::LispList;
         use super::lisp::Type;
 
-        let test = LispList::Cons(Type::Int(32), Box::new(LispList::Cons(Type::Atom("a".to_string()), Box::new(LispList::Nil))));
+        let test = LispList::Cons(Type::Int(32), Box::new(LispList::Cons(Type::Atom(Box::new("a".to_string())), Box::new(LispList::Nil))));
         let test2 = LispList::Cons(Type::LispList(Box::new(LispList::Nil)), Box::new(LispList::Nil));
         
         assert_eq!(test.len(), 2);
         assert_eq!(test2.len(), 1);
-        
+
 
 
         assert_eq!(2 + 2, 4);
