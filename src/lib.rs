@@ -1,38 +1,34 @@
+// TODO ドキュメントコメントを書く
+
 mod lisp{
 
-    use std::str::Chars;
     // リスト表現
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum LispList{
         Cons(Type, Box<LispList>),
         Nil
     }
 
     // 許容する型一覧
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Type{
         Int(i32),
         Atom(Box<String>), // Typeをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Boxingする
         LispList(Box<LispList>)
     }
 
-    // lispモジュールのエラーを定義
-    pub enum LispError {
-    }
-
     // リスト操作を行う関数
     impl LispList {
         
-        fn new() -> LispList {
+        pub fn new() -> LispList {
             return LispList::Nil;
         }
 
-        fn push_front(&self, tp : Type) -> LispList {
-            
-            return LispList::Cons(tp, Box::new(self.clone()));
+        pub fn cons(&self, tp : &Type) -> LispList {
+            return LispList::Cons(tp.clone(), Box::new(self.clone()));
         }
 
-        fn head(&self) -> Option<Type> {
+        pub fn head(&self) -> Option<Type> {
             match self {
                 &LispList::Nil => {
                     return None;
@@ -43,7 +39,7 @@ mod lisp{
             }
         }
 
-        fn tail(&self) -> LispList {
+        pub fn tail(&self) -> LispList {
             match self {
                 LispList::Nil => return self.clone(),
                 LispList::Cons(_, ref tail) => {
@@ -80,7 +76,7 @@ mod lisp{
             *index += 1;
             loop {
                 let result = to_type_(index, bytes);
-                list.push_front(result);
+                list = list.cons(&result);
 
                 // spaceを飛ばす
                 while *index < bytes.len() && char::from(bytes[*index]) == ' ' {
@@ -129,8 +125,12 @@ mod lisp{
                 if c.is_ascii_digit() {
                     // unwrapしているが、直前のif文で数字かどうかを判定しているので panic は発生しない
                     // num = num * 10 + c.to_digit(10).unwrap() as i32;
+
+                    // TODO implementation
+
                 }
                 else if c.is_alphabetic() {
+                    // TODO implementation
 
                 }
                 else{
@@ -154,18 +154,41 @@ mod lisp{
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_works() {
+    fn lisplist_tests() {
         use super::lisp::LispList;
         use super::lisp::Type;
 
-        let test = LispList::Cons(Type::Int(32), Box::new(LispList::Cons(Type::Atom(Box::new("a".to_string())), Box::new(LispList::Nil))));
-        let test2 = LispList::Cons(Type::LispList(Box::new(LispList::Nil)), Box::new(LispList::Nil));
+        let list1 = LispList::Cons(Type::Int(32), 
+                                   Box::new(LispList::Cons(Type::Atom(Box::new("a".to_string())), Box::new(LispList::Nil))));
+        let list2 = LispList::Cons(Type::LispList(Box::new(LispList::Nil)), Box::new(LispList::Nil));
         
-        assert_eq!(test.len(), 2);
-        assert_eq!(test2.len(), 1);
+        // len test
+        assert_eq!(list1.len(), 2);
+        assert_eq!(list2.len(), 1);
 
+        // head test
+        assert_eq!(list1.head(), Some(Type::Int(32)));
 
+        // tail test
+        assert_eq!(list1.tail(), LispList::Cons(Type::Atom(Box::new("a".to_string())), Box::new(LispList::Nil)));
 
-        assert_eq!(2 + 2, 4);
+        // cons test
+        {
+            let l1 = LispList::Cons(Type::Int(10), Box::new(LispList::Nil));
+            assert_eq!(l1.cons(&Type::Int(11)), LispList::Cons(Type::Int(11), Box::new(l1)));
+        }
+
+        // partial_eqの挙動をついでにテスト。boxの中身もちゃんと見ている様子。
+        {
+            let t1 = Type::Atom(Box::new("abc".to_string()));
+            let t2 = Type::Atom(Box::new("abc".to_string()));
+            assert_eq!(t1, t2);
+        }
+        {
+            let t1 = Type::Atom(Box::new("abc".to_string()));
+            let t2 = Type::Atom(Box::new("ab".to_string()));
+            assert_ne!(t1, t2);
+        }
+
     }
 }
