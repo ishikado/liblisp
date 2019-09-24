@@ -19,7 +19,7 @@ mod lisp {
 
     #[derive(Debug, Clone, PartialEq)]
     pub enum TypeConversionError {
-        InvalidToken
+        InvalidToken,
     }
 
     // リスト操作を行う関数
@@ -61,6 +61,22 @@ mod lisp {
                 }
             }
         }
+
+        // reverse自要素をreverseしたlistを返す
+        pub fn reverse(&self) -> LispList {
+            return Self::reverse_(self.clone(), LispList::new());
+        }
+
+        fn reverse_(old: LispList, new: LispList) -> LispList {
+            match old.head() {
+                None => {
+                    return new;
+                }
+                Some(hd) => {
+                    return Self::reverse_(old.tail(), new.cons(&hd));
+                }
+            }
+        }
     }
 
     // 文字列を受け取り、Type形式に変換する関数
@@ -89,10 +105,9 @@ mod lisp {
                 } else if char::from(bytes[*index]) == ')' {
                     // end
                     *index += 1;
-                    // TODO : reverse list
-                    return Ok(Type::LispList(Box::new(list)));
-                }                
-                
+                    return Ok(Type::LispList(Box::new(list.reverse())));
+                }
+
                 // 新しい要素を追加
                 let result = to_type_(index, bytes)?;
                 list = list.cons(&result);
@@ -146,15 +161,41 @@ mod tests {
     #[test]
     fn to_type_tests() {
         use super::lisp::*;
-        
+
         assert_eq!(to_type("12345".as_bytes()), Ok(Type::Int(12345)));
-        assert_eq!(to_type("atom".as_bytes()), Ok(Type::Atom(Box::new("atom".to_string()))));
-        assert_eq!(to_type("atom123".as_bytes()), Ok(Type::Atom(Box::new("atom123".to_string()))));
-        assert_eq!(to_type("123atom".as_bytes()), Err(TypeConversionError::InvalidToken));
-        assert_eq!(to_type("( )".as_bytes()), Ok(Type::LispList(Box::new(LispList::Nil))));
-        assert_eq!(to_type("( ( ) )".as_bytes()), Ok(Type::LispList(
-            Box::new(LispList::Cons(Type::LispList(Box::new(LispList::Nil)), Box::new(LispList::Nil))))));
-        
+        assert_eq!(
+            to_type("atom".as_bytes()),
+            Ok(Type::Atom(Box::new("atom".to_string())))
+        );
+        assert_eq!(
+            to_type("atom123".as_bytes()),
+            Ok(Type::Atom(Box::new("atom123".to_string())))
+        );
+        assert_eq!(
+            to_type("123atom".as_bytes()),
+            Err(TypeConversionError::InvalidToken)
+        );
+        assert_eq!(
+            to_type("( )".as_bytes()),
+            Ok(Type::LispList(Box::new(LispList::Nil)))
+        );
+        assert_eq!(
+            to_type("( ( ) )".as_bytes()),
+            Ok(Type::LispList(Box::new(LispList::Cons(
+                Type::LispList(Box::new(LispList::Nil)),
+                Box::new(LispList::Nil)
+            ))))
+        );
+        assert_eq!(
+            to_type("(atom ( ) )".as_bytes()),
+            Ok(Type::LispList(Box::new(LispList::Cons(
+                Type::Atom(Box::new("atom".to_string())),
+                Box::new(LispList::Cons(
+                    Type::LispList(Box::new(LispList::Nil)),
+                    Box::new(LispList::Nil)
+                ))
+            ))))
+        );
     }
 
     #[test]
