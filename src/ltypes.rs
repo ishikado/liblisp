@@ -77,7 +77,7 @@ impl LispList {
     }
 }
 
-impl Type{
+impl Type {
     // 文字列を受け取り、Type形式に変換する関数
     pub fn from(bytes: &[u8]) -> Result<Type, TypeConversionError> {
         let mut index = 0;
