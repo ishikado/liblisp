@@ -91,8 +91,10 @@ impl Type {
         if head_ch == '(' {
             *index += 1;
             loop {
-                // spaceを飛ばす
-                while *index < bytes.len() && char::from(bytes[*index]) == ' ' {
+                // space or \n を飛ばす
+                while *index < bytes.len()
+                    && (char::from(bytes[*index]) == ' ' || char::from(bytes[*index]) == '\n')
+                {
                     *index += 1;
                 }
 
@@ -120,8 +122,8 @@ impl Type {
                     // unwrapしているが、直前のif文で数字かどうかを判定しているので panic は発生しない
                     num = num * 10 + c.to_digit(10).unwrap() as i32;
                 } else {
-                    // 括弧 or space 以外の文字が続いていたら異常
-                    if !(c == ')' || c == ' ') {
+                    // 括弧 or space or 改行 以外の文字が続いていたら異常
+                    if !(c == ')' || c == ' ' || c == '\n') {
                         return Err(TypeConversionError::InvalidToken);
                     }
                     break;
@@ -139,8 +141,8 @@ impl Type {
                 if c.is_ascii_digit() || c.is_alphabetic() {
                     atom.push(c);
                 } else {
-                    // 括弧 or space 以外の文字が続いていたら異常
-                    if !(c == ')' || c == ' ') {
+                    // 括弧 or space or 改行 以外の文字が続いていたら異常
+                    if !(c == ')' || c == ' ' || c == '\n') {
                         return Err(TypeConversionError::InvalidToken);
                     }
                     break;
