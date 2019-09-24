@@ -1,4 +1,5 @@
 // liblispで、lisp構造の表現に用いる型定義
+// TODO: Boxのcloneはおそらくdepp copyが走って中身が全部コピーされるので、やめたい
 
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
