@@ -1,4 +1,4 @@
-// TODO ドキュメントコメントを書く
+// liblispで、lisp構造の表現に用いる型定義
 
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
@@ -151,7 +151,6 @@ fn to_type_(index: &mut usize, bytes: &[u8]) -> Result<Type, TypeConversionError
     }
     return Err(TypeConversionError::InvalidToken);
 }
-
 
 #[cfg(test)]
 mod tests {
