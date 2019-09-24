@@ -156,7 +156,7 @@ impl Type{
 #[cfg(test)]
 mod tests {
     #[test]
-    fn from_tests() {
+    fn type_tests() {
         use crate::ltypes::*;
 
         assert_eq!(Type::from("12345".as_bytes()), Ok(Type::Int(12345)));
