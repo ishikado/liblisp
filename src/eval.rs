@@ -5,9 +5,8 @@ pub enum EvalError {
     TypeMismatch,
 }
 
+// exp を評価する
 pub fn eval(exp: Type) -> Result<Type, EvalError> {
-    // TODO: 実装する
-    // Typeを受け取り、式を評価、結果をTypeで返す
     match exp {
         Type::Int(_) => {
             return Ok(exp);
