@@ -1,16 +1,14 @@
 use crate::ltypes::*;
 use std::collections::HashMap;
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     Unexpected,
     TypeMismatch,
     BadArrity,
     NotImplementation,
-    EvaluatingNonAtomHeadList
+    EvaluatingNonAtomHeadList,
 }
-
 
 // exp を評価する
 pub fn eval(exp: Type) -> Result<Type, EvalError> {
@@ -23,10 +21,11 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
         }
         Type::LispList(clist) => {
             // 組み込み関数のテーブル
-            let mut embeded_fn_table : HashMap<&str, fn(LispList) -> Result<Type, EvalError >>  = HashMap::new();
+            let mut embeded_fn_table: HashMap<&str, fn(LispList) -> Result<Type, EvalError>> =
+                HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
-            
+
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             // まずは四則演算を扱いたい -> add sub mul div
             if let Some(head) = clist.head() {
@@ -36,14 +35,13 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
                         let result = f(tail)?;
                         return Ok(result);
-                    }
-                    else{
+                    } else {
                         // TODO: ユーザ定義関数の適用
                         return Err(EvalError::Unexpected);
                     }
                 }
                 // Atomが先頭要素でない場合、評価できない
-                else{
+                else {
                     return Err(EvalError::EvaluatingNonAtomHeadList);
                 }
             } else {
@@ -57,11 +55,11 @@ enum ArithType {
     Add,
     Sub,
     Mul,
-    Div
+    Div,
 }
 
 // 加減乗除の演算を行う
-fn four_arith_op(l : LispList, tp : ArithType) -> Result<Type, EvalError> {
+fn four_arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -84,13 +82,12 @@ fn four_arith_op(l : LispList, tp : ArithType) -> Result<Type, EvalError> {
         return Err(EvalError::TypeMismatch);
     }
 
-    let calc_result = 
-        match tp {
-            ArithType::Add => aint + bint,
-            ArithType::Sub => aint - bint,
-            ArithType::Mul => aint * bint,
-            ArithType::Div => aint / bint,
-        };
+    let calc_result = match tp {
+        ArithType::Add => aint + bint,
+        ArithType::Sub => aint - bint,
+        ArithType::Mul => aint * bint,
+        ArithType::Div => aint / bint,
+    };
     return Ok(Type::Int(calc_result));
 }
 
@@ -110,7 +107,6 @@ fn mul(l: LispList) -> Result<Type, EvalError> {
 fn div(l: LispList) -> Result<Type, EvalError> {
     return four_arith_op(l, ArithType::Div);
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -161,6 +157,5 @@ mod tests {
                 Err(e) => assert_eq!(EvalError::EvaluatingNonAtomHeadList, e),
             }
         }
-
     }
 }
