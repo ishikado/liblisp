@@ -1,9 +1,16 @@
 use crate::ltypes::*;
+use std::collections::HashMap;
 
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     Unexpected,
     TypeMismatch,
+    BadArrity,
+    NotImplementation,
+    EvalingNonAtomHeadList
 }
+
 
 // exp を評価する
 pub fn eval(exp: Type) -> Result<Type, EvalError> {
@@ -15,33 +22,29 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
             return Ok(exp);
         }
         Type::LispList(clist) => {
+            // 組み込み関数のテーブル
+            let mut embeded_fn_table : HashMap<&str, fn(LispList) -> Result<Type, EvalError >>  = HashMap::new();
+            embeded_fn_table.insert("add", add);
+            embeded_fn_table.insert("sub", sub);
+            
             // リスト形式をevalする時、先頭のatomを関数名として扱う
-            // まずは四則演算を扱いたい -> plus minus mul div
-            if let Some(fun_name) = clist.head() {
-                let tail_list = clist.tail();
-                // TODO: matchは組み込み関数とユーザ定義関数の２つに分けて、atomが一致する関数の探索は、matchではなく、mapから関数名をkeyとして検索できるようにしたい
-                // fun_nameにmatchする関数がリストにあるか探し、もし見つかったら tail_list を引数として渡す
-                match fun_name {
-                    Type::Atom(ref b)
-                        if &Box::new("plus".to_string()) == b && tail_list.len() == 2 =>
-                    {
-                        let arg1 = eval(tail_list.head().unwrap())?;
-                        let arg2 = eval(tail_list.tail().head().unwrap())?;
-                        let result = add(arg1, arg2)?;
+            // まずは四則演算を扱いたい -> add sub mul div
+            if let Some(head) = clist.head() {
+                let tail = clist.tail();
+                if let Type::Atom(fun_name) = head {
+                    // 組み込み関数の適用
+                    if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
+                        let result = f(tail)?;
                         return Ok(result);
                     }
-                    Type::Atom(ref b)
-                        if &Box::new("sub".to_string()) == b && tail_list.len() == 2 =>
-                    {
-                        let arg1 = eval(tail_list.head().unwrap())?;
-                        let arg2 = eval(tail_list.tail().head().unwrap())?;
-                        let result = sub(arg1, arg2)?;
-                        return Ok(result);
-                    }
-                    _ => {
-                        // TODO: ユーザ定義関数を呼ぶ
+                    else{
+                        // TODO: ユーザ定義関数の適用
                         return Err(EvalError::Unexpected);
                     }
+                }
+                // Atomが先頭要素でない場合、評価できない
+                else{
+                    return Err(EvalError::EvalingNonAtomHeadList);
                 }
             } else {
                 return Err(EvalError::Unexpected);
@@ -51,7 +54,15 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
 }
 
 // 加算を行う関数（型チェック付き）
-fn add(a: Type, b: Type) -> Result<Type, EvalError> {
+fn add(l: LispList) -> Result<Type, EvalError> {
+
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let a = eval(l.head().unwrap())?;
+    let b = eval(l.tail().head().unwrap())?;
+
     let aint;
     let bint;
 
@@ -73,7 +84,15 @@ fn add(a: Type, b: Type) -> Result<Type, EvalError> {
 }
 
 // 減算を行う関数（型チェック付き）
-fn sub(a: Type, b: Type) -> Result<Type, EvalError> {
+fn sub(l: LispList) -> Result<Type, EvalError> {
+
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let a = eval(l.head().unwrap())?;
+    let b = eval(l.tail().head().unwrap())?;
+
     let aint;
     let bint;
 
@@ -102,7 +121,7 @@ mod tests {
 
         // 四則演算の関数呼び出し
         {
-            let exp = Type::from("(plus 1 2)".as_bytes()).unwrap();
+            let exp = Type::from("(add 1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(3)) => assert!(true),
                 _ => assert!(false),
@@ -119,7 +138,7 @@ mod tests {
 
         // 関数をネストできる
         {
-            let exp = Type::from("(plus (plus (sub 1 2) 3) 4)".as_bytes()).unwrap();
+            let exp = Type::from("(add (add (sub 1 2) 3) 4)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(6)) => assert!(true),
                 _ => assert!(false),
