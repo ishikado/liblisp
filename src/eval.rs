@@ -53,65 +53,64 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
     }
 }
 
-// 加算を行う関数（型チェック付き）
+enum ArithType {
+    Add,
+    Sub,
+    Mul,
+    Div
+}
+
+// 加減乗除の演算を行う
+fn four_arith_op(l : LispList, tp : ArithType) -> Result<Type, EvalError> {
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let a = eval(l.head().unwrap())?;
+    let b = eval(l.tail().head().unwrap())?;
+
+    let aint;
+    let bint;
+
+    if let Type::Int(num) = a {
+        aint = num;
+    } else {
+        return Err(EvalError::TypeMismatch);
+    }
+
+    if let Type::Int(num) = b {
+        bint = num;
+    } else {
+        return Err(EvalError::TypeMismatch);
+    }
+
+    let calc_result = 
+        match tp {
+            ArithType::Add => aint + bint,
+            ArithType::Sub => aint - bint,
+            ArithType::Mul => aint * bint,
+            ArithType::Div => aint / bint,
+        };
+    return Ok(Type::Int(calc_result));
+}
+
+// 加算を行う
 fn add(l: LispList) -> Result<Type, EvalError> {
-
-    if l.len() != 2 {
-        return Err(EvalError::BadArrity);
-    }
-
-    let a = eval(l.head().unwrap())?;
-    let b = eval(l.tail().head().unwrap())?;
-
-    let aint;
-    let bint;
-
-    if let Type::Int(num) = a {
-        aint = num;
-    } else {
-        return Err(EvalError::TypeMismatch);
-    }
-
-    if let Type::Int(num) = b {
-        bint = num;
-    } else {
-        return Err(EvalError::TypeMismatch);
-    }
-
-    let result = Type::Int(aint + bint);
-
-    return Ok(result);
+    return four_arith_op(l, ArithType::Add);
 }
-
-// 減算を行う関数（型チェック付き）
+// 減算を行う
 fn sub(l: LispList) -> Result<Type, EvalError> {
-
-    if l.len() != 2 {
-        return Err(EvalError::BadArrity);
-    }
-
-    let a = eval(l.head().unwrap())?;
-    let b = eval(l.tail().head().unwrap())?;
-
-    let aint;
-    let bint;
-
-    if let Type::Int(num) = a {
-        aint = num;
-    } else {
-        return Err(EvalError::TypeMismatch);
-    }
-
-    if let Type::Int(num) = b {
-        bint = num;
-    } else {
-        return Err(EvalError::TypeMismatch);
-    }
-
-    let result = Type::Int(aint - bint);
-
-    return Ok(result);
+    return four_arith_op(l, ArithType::Sub);
 }
+// 乗算を行う
+fn mul(l: LispList) -> Result<Type, EvalError> {
+    return four_arith_op(l, ArithType::Mul);
+}
+// 除算を行う
+fn div(l: LispList) -> Result<Type, EvalError> {
+    return four_arith_op(l, ArithType::Div);
+}
+
 
 #[cfg(test)]
 mod tests {
