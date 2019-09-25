@@ -100,7 +100,6 @@ mod tests {
     #[test]
     fn exp_tests() {
         use crate::eval::*;
-        use crate::ltypes::*;
 
         // 四則演算の関数呼び出し
         {
