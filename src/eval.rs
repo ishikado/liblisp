@@ -8,7 +8,7 @@ pub enum EvalError {
     TypeMismatch,
     BadArrity,
     NotImplementation,
-    EvalingNonAtomHeadList
+    EvaluatingNonAtomHeadList
 }
 
 
@@ -44,7 +44,7 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 }
                 // Atomが先頭要素でない場合、評価できない
                 else{
-                    return Err(EvalError::EvalingNonAtomHeadList);
+                    return Err(EvalError::EvaluatingNonAtomHeadList);
                 }
             } else {
                 return Err(EvalError::Unexpected);
@@ -143,5 +143,24 @@ mod tests {
                 _ => assert!(false),
             }
         }
+
+        // 引数の数が足りない
+        {
+            let exp = Type::from("(add 1)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(_) => assert!(false),
+                Err(e) => assert_eq!(EvalError::BadArrity, e),
+            }
+        }
+
+        // atomが先頭要素でない
+        {
+            let exp = Type::from("(1 2)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(_) => assert!(false),
+                Err(e) => assert_eq!(EvalError::EvaluatingNonAtomHeadList, e),
+            }
+        }
+
     }
 }
