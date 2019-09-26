@@ -39,14 +39,10 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
                         let mut evaluated = LispList::new();
                         let mut now = tail;
-                        loop {
-                            if now == LispList::Nil {
-                                break;
-                            } else {
-                                let c = eval(now.head().unwrap())?;
-                                evaluated = evaluated.cons(&c);
-                                now = now.tail();
-                            }
+                        while now != LispList::Nil {
+                            let c = eval(now.head().unwrap())?;
+                            evaluated = evaluated.cons(&c);
+                            now = now.tail();
                         }
                         evaluated = evaluated.reverse();
                         let result = f(evaluated)?;
@@ -72,15 +68,10 @@ fn list(l: LispList) -> Result<Type, EvalError> {
     // リストが空になるまで調べる
     let mut tmp = l;
     let mut newlist = LispList::new();
-    loop {
-        if let Some(c) = tmp.head() {
-            // 引数は必ず評価する
-            newlist = newlist.cons(&c);
-            tmp = tmp.tail();
-        } else {
-            // headできない場合、リストが空
-            break;
-        }
+    while let Some(c) = tmp.head() {
+        // 引数は必ず評価する
+        newlist = newlist.cons(&c);
+        tmp = tmp.tail();
     }
     newlist = newlist.reverse();
     return Ok(Type::LispList(Box::new(newlist)));
