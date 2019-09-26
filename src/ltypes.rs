@@ -4,6 +4,7 @@
 // Rcあたりをつかって、中身をコピーせずに、ポインタだけ複数の箇所から参照できるようにしたい
 
 // リスト表現
+// TODO: iterator の実装を検討
 #[derive(Debug, Clone, PartialEq)]
 pub enum LispList {
     Cons(Type, Box<LispList>),

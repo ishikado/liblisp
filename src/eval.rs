@@ -37,10 +37,19 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 if let Type::Atom(fun_name) = head {
                     // 組み込み関数の適用
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
-                        // TODO: tailはここで、すべての要素に対して eval を呼んでから関数 f に渡したい
-                        // 現在は f の中で eval しているので、同じ実装がそれぞれの f ごとに存在してしまっている
-
-                        let result = f(tail)?;
+                        let mut evaluated = LispList::new();
+                        let mut now = tail;
+                        loop {
+                            if now == LispList::Nil {
+                                break;
+                            } else {
+                                let c = eval(now.head().unwrap())?;
+                                evaluated = evaluated.cons(&c);
+                                now = now.tail();
+                            }
+                        }
+                        evaluated = evaluated.reverse();
+                        let result = f(evaluated)?;
                         return Ok(result);
                     } else {
                         // TODO: ユーザ定義関数の適用
@@ -66,8 +75,7 @@ fn list(l: LispList) -> Result<Type, EvalError> {
     loop {
         if let Some(c) = tmp.head() {
             // 引数は必ず評価する
-            let a = eval(c)?;
-            newlist = newlist.cons(&a);
+            newlist = newlist.cons(&c);
             tmp = tmp.tail();
         } else {
             // headできない場合、リストが空
@@ -83,7 +91,7 @@ fn head(l: LispList) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
-    let a = eval(l.head().unwrap())?;
+    let a = l.head().unwrap();
     if let Type::LispList(b) = a {
         if let Some(c) = b.head() {
             return Ok(c);
@@ -100,7 +108,7 @@ fn tail(l: LispList) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
-    let a = eval(l.head().unwrap())?;
+    let a = l.head().unwrap();
     if let Type::LispList(b) = a {
         return Ok(Type::LispList(Box::new(b.tail())));
     } else {
@@ -138,8 +146,8 @@ fn arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
         return Err(EvalError::BadArrity);
     }
 
-    let a = eval(l.head().unwrap())?;
-    let b = eval(l.tail().head().unwrap())?;
+    let a = l.head().unwrap();
+    let b = l.tail().head().unwrap();
 
     let aint;
     let bint;
