@@ -26,8 +26,9 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
-            embeded_fn_table.insert("head", head);
             embeded_fn_table.insert("list", list);
+            embeded_fn_table.insert("head", head);
+            embeded_fn_table.insert("tail", tail);
 
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             // まずは四則演算を扱いたい -> add sub mul div
@@ -89,6 +90,19 @@ fn head(l: LispList) -> Result<Type, EvalError> {
         } else {
             return Err(EvalError::DoHeadForNil);
         }
+    } else {
+        return Err(EvalError::TypeMismatch);
+    }
+}
+
+// リストの先頭要素外を取り除いたものを返す
+fn tail(l: LispList) -> Result<Type, EvalError> {
+    if l.len() != 1 {
+        return Err(EvalError::BadArrity);
+    }
+    let a = eval(l.head().unwrap())?;
+    if let Type::LispList(b) = a {
+        return Ok(Type::LispList(Box::new(b.tail())));
     } else {
         return Err(EvalError::TypeMismatch);
     }
@@ -222,8 +236,20 @@ mod tests {
         }
         // head
         {
-            let exp = eval(Type::from("(head (list 10 20 30))".as_bytes()).unwrap());
+            let exp = eval(Type::from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
             assert_eq!(exp, Ok(Type::Int(10)));
+        }
+
+        // tail
+        {
+            let exp = eval(Type::from("(tail (list 1 2 3))".as_bytes()).unwrap());
+            assert_eq!(
+                exp,
+                Ok(Type::LispList(Box::new(LispList::Cons(
+                    Type::Int(2),
+                    Box::new(LispList::Cons(Type::Int(3), Box::new(LispList::Nil)))
+                ))))
+            );
         }
     }
 
