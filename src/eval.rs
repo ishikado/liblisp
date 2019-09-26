@@ -7,6 +7,7 @@ pub enum EvalError {
     TypeMismatch,
     BadArrity,
     NotImplementation,
+    DoHeadForNil,
     EvaluatingNonAtomHeadList,
 }
 
@@ -25,6 +26,8 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
+            embeded_fn_table.insert("head", head);
+            embeded_fn_table.insert("list", list);
 
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             // まずは四則演算を扱いたい -> add sub mul div
@@ -33,6 +36,9 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 if let Type::Atom(fun_name) = head {
                     // 組み込み関数の適用
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
+                        // TODO: tailはここで、すべての要素に対して eval を呼んでから関数 f に渡したい
+                        // 現在は f の中で eval しているので、同じ実装がそれぞれの f ごとに存在してしまっている
+
                         let result = f(tail)?;
                         return Ok(result);
                     } else {
@@ -51,6 +57,43 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
     }
 }
 
+// リストを作成する
+fn list(l: LispList) -> Result<Type, EvalError> {
+    // リストが空になるまで調べる
+    let mut tmp = l;
+    let mut newlist = LispList::new();
+    loop {
+        if let Some(c) = tmp.head() {
+            // 引数は必ず評価する
+            let a = eval(c)?;
+            newlist = newlist.cons(&a);
+            tmp = tmp.tail();
+        } else {
+            // headできない場合、リストが空
+            break;
+        }
+    }
+    newlist = newlist.reverse();
+    return Ok(Type::LispList(Box::new(newlist)));
+}
+
+// リストの先頭要素を取り出す
+fn head(l: LispList) -> Result<Type, EvalError> {
+    if l.len() != 1 {
+        return Err(EvalError::BadArrity);
+    }
+    let a = eval(l.head().unwrap())?;
+    if let Type::LispList(b) = a {
+        if let Some(c) = b.head() {
+            return Ok(c);
+        } else {
+            return Err(EvalError::DoHeadForNil);
+        }
+    } else {
+        return Err(EvalError::TypeMismatch);
+    }
+}
+
 enum ArithType {
     Add,
     Sub,
@@ -58,8 +101,25 @@ enum ArithType {
     Div,
 }
 
+// 加算を行う
+fn add(l: LispList) -> Result<Type, EvalError> {
+    return arith_op(l, ArithType::Add);
+}
+// 減算を行う
+fn sub(l: LispList) -> Result<Type, EvalError> {
+    return arith_op(l, ArithType::Sub);
+}
+// 乗算を行う
+fn mul(l: LispList) -> Result<Type, EvalError> {
+    return arith_op(l, ArithType::Mul);
+}
+// 除算を行う
+fn div(l: LispList) -> Result<Type, EvalError> {
+    return arith_op(l, ArithType::Div);
+}
+
 // 加減乗除の演算を行う
-fn four_arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
+fn arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -91,27 +151,10 @@ fn four_arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
     return Ok(Type::Int(calc_result));
 }
 
-// 加算を行う
-fn add(l: LispList) -> Result<Type, EvalError> {
-    return four_arith_op(l, ArithType::Add);
-}
-// 減算を行う
-fn sub(l: LispList) -> Result<Type, EvalError> {
-    return four_arith_op(l, ArithType::Sub);
-}
-// 乗算を行う
-fn mul(l: LispList) -> Result<Type, EvalError> {
-    return four_arith_op(l, ArithType::Mul);
-}
-// 除算を行う
-fn div(l: LispList) -> Result<Type, EvalError> {
-    return four_arith_op(l, ArithType::Div);
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
-    fn exp_tests() {
+    fn arithmetic_tests() {
         use crate::eval::*;
 
         // 四則演算の関数呼び出し
@@ -158,4 +201,30 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn list_tests() {
+        use crate::eval::*;
+
+        // list
+        {
+            let exp = eval(Type::from("(list 1 2 3)".as_bytes()).unwrap());
+            assert_eq!(
+                exp,
+                Ok(Type::LispList(Box::new(LispList::Cons(
+                    Type::Int(1),
+                    Box::new(LispList::Cons(
+                        Type::Int(2),
+                        Box::new(LispList::Cons(Type::Int(3), Box::new(LispList::Nil)))
+                    ))
+                ))))
+            );
+        }
+        // head
+        {
+            let exp = eval(Type::from("(head (list 10 20 30))".as_bytes()).unwrap());
+            assert_eq!(exp, Ok(Type::Int(10)));
+        }
+    }
+
 }

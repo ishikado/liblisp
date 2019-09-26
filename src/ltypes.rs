@@ -1,5 +1,7 @@
 // liblispで、lisp構造の表現に用いる型定義
+
 // TODO: Boxのcloneはおそらくdepp copyが走って中身が全部コピーされるので、やめたい
+// Rcあたりをつかって、中身をコピーせずに、ポインタだけ複数の箇所から参照できるようにしたい
 
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
