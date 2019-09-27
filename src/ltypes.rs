@@ -111,6 +111,7 @@ impl LispList {
 
 impl Type {
     // 文字列を受け取り、Type形式に変換する関数
+    // TODO 実装を TryFrm trait に変更する
     pub fn from(bytes: &[u8]) -> Result<Type, TypeConversionError> {
         let mut index = 0;
         return Self::from_(&mut index, bytes);
