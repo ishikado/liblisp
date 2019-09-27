@@ -10,19 +10,35 @@ pub enum LispList {
     Nil,
 }
 
-impl Iterator for LispList {
+pub struct LispListIterator {
+    list : LispList
+}
+
+impl Iterator for LispListIterator {
     type Item = LispList;
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            &mut LispList::Cons(_, ref tail) => {
-                Some((*tail.clone()).clone())
+        let res = self.list.clone();
+        match self.list {
+            LispList::Nil => {
+                return None;
             },
-            &mut LispList::Nil => {
-                None
+            LispList::Cons(_, ref r) => {
+                self.list = (*r.clone()).clone();
+                return Some(res);
             }
         }
     }
 }
+
+impl IntoIterator for LispList {
+    type Item = LispList;
+    type IntoIter = LispListIterator;
+    fn into_iter(self) -> Self::IntoIter {
+        LispListIterator{list : self.clone()}
+    }
+}
+
+
 
 // 許容する型一覧
 #[derive(Debug, Clone, PartialEq)]

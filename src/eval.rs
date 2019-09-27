@@ -23,8 +23,7 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
         }
         Type::LispList(clist) => {
             // 組み込み関数のテーブル
-            let mut embeded_fn_table: HashMap<&str, fn(LispList) -> Result<Type, EvalError>> =
-                HashMap::new();
+            let mut embeded_fn_table: HashMap<&str, fn(LispList) -> Result<Type, EvalError>> =HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
             embeded_fn_table.insert("list", list);
@@ -37,12 +36,12 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 if let Type::Atom(fun_name) = head {
                     // 組み込み関数の適用
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
-                        // return Err(EvalError::Unexpected);
                         // 引数をそれぞれ評価する
                         let evaluated : LispList = 
-                            clist.tail()
+                            clist.tail().into_iter()
                             .try_fold(LispList::new(),
                                       |acc, e| {
+                                          println!("{:?}", e);
                                           let res = eval(e.head().unwrap())?;
                                           Ok(acc.cons(&res))
                                       })?;
@@ -66,16 +65,7 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
 
 // リストを作成する
 fn list(l: LispList) -> Result<Type, EvalError> {
-    // リストが空になるまで調べる
-    let mut tmp = l;
-    let mut newlist = LispList::new();
-    while let Some(c) = tmp.head() {
-        // 引数は必ず評価する
-        newlist = newlist.cons(&c);
-        tmp = tmp.tail();
-    }
-    newlist = newlist.reverse();
-    return Ok(Type::LispList(Rc::new(newlist)));
+    return Ok(Type::LispList(Rc::new(l)));
 }
 
 // リストの先頭要素を取り出す
