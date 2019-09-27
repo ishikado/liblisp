@@ -1,13 +1,12 @@
 // liblispで、lisp構造の表現に用いる型定義
 
-// TODO: Boxのcloneはおそらくdepp copyが走って中身が全部コピーされるので、やめたい
-// Rcあたりをつかって、中身をコピーせずに、ポインタだけ複数の箇所から参照できるようにしたい
+use std::rc::Rc;
 
 // リスト表現
 // TODO: iterator の実装を検討
 #[derive(Debug, Clone, PartialEq)]
 pub enum LispList {
-    Cons(Type, Box<LispList>),
+    Cons(Type, Rc<LispList>),
     Nil,
 }
 
@@ -15,8 +14,8 @@ pub enum LispList {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Int(i32),
-    Atom(Box<String>), // Typeをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Boxingする
-    LispList(Box<LispList>),
+    Atom(Rc<String>), // Typeをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
+    LispList(Rc<LispList>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,7 +30,7 @@ impl LispList {
     }
 
     pub fn cons(&self, tp: &Type) -> LispList {
-        return LispList::Cons(tp.clone(), Box::new(self.clone()));
+        return LispList::Cons(tp.clone(), Rc::new(self.clone()));
     }
 
     pub fn head(&self) -> Option<Type> {
@@ -49,7 +48,7 @@ impl LispList {
         match self {
             LispList::Nil => return self.clone(),
             LispList::Cons(_, ref tail) => {
-                return *tail.clone();
+                return (*tail.clone()).clone();
             }
         }
     }
@@ -109,7 +108,7 @@ impl Type {
                 } else if char::from(bytes[*index]) == ')' {
                     // end
                     *index += 1;
-                    return Ok(Type::LispList(Box::new(list.reverse())));
+                    return Ok(Type::LispList(Rc::new(list.reverse())));
                 }
 
                 // 新しい要素を追加
@@ -153,7 +152,7 @@ impl Type {
                 }
                 *index += 1;
             }
-            return Ok(Type::Atom(Box::new(atom)));
+            return Ok(Type::Atom(Rc::new(atom)));
         }
         return Err(TypeConversionError::InvalidToken);
     }
@@ -168,11 +167,11 @@ mod tests {
         assert_eq!(Type::from("12345".as_bytes()), Ok(Type::Int(12345)));
         assert_eq!(
             Type::from("atom".as_bytes()),
-            Ok(Type::Atom(Box::new("atom".to_string())))
+            Ok(Type::Atom(Rc::new("atom".to_string())))
         );
         assert_eq!(
             Type::from("atom123".as_bytes()),
-            Ok(Type::Atom(Box::new("atom123".to_string())))
+            Ok(Type::Atom(Rc::new("atom123".to_string())))
         );
         assert_eq!(
             Type::from("123atom".as_bytes()),
@@ -180,22 +179,22 @@ mod tests {
         );
         assert_eq!(
             Type::from("( )".as_bytes()),
-            Ok(Type::LispList(Box::new(LispList::Nil)))
+            Ok(Type::LispList(Rc::new(LispList::Nil)))
         );
         assert_eq!(
             Type::from("( ( ) )".as_bytes()),
-            Ok(Type::LispList(Box::new(LispList::Cons(
-                Type::LispList(Box::new(LispList::Nil)),
-                Box::new(LispList::Nil)
+            Ok(Type::LispList(Rc::new(LispList::Cons(
+                Type::LispList(Rc::new(LispList::Nil)),
+                Rc::new(LispList::Nil)
             ))))
         );
         assert_eq!(
             Type::from("(atom ( ) )".as_bytes()),
-            Ok(Type::LispList(Box::new(LispList::Cons(
-                Type::Atom(Box::new("atom".to_string())),
-                Box::new(LispList::Cons(
-                    Type::LispList(Box::new(LispList::Nil)),
-                    Box::new(LispList::Nil)
+            Ok(Type::LispList(Rc::new(LispList::Cons(
+                Type::Atom(Rc::new("atom".to_string())),
+                Rc::new(LispList::Cons(
+                    Type::LispList(Rc::new(LispList::Nil)),
+                    Rc::new(LispList::Nil)
                 ))
             ))))
         );
@@ -207,14 +206,14 @@ mod tests {
 
         let list1 = LispList::Cons(
             Type::Int(32),
-            Box::new(LispList::Cons(
-                Type::Atom(Box::new("a".to_string())),
-                Box::new(LispList::Nil),
+            Rc::new(LispList::Cons(
+                Type::Atom(Rc::new("a".to_string())),
+                Rc::new(LispList::Nil),
             )),
         );
         let list2 = LispList::Cons(
-            Type::LispList(Box::new(LispList::Nil)),
-            Box::new(LispList::Nil),
+            Type::LispList(Rc::new(LispList::Nil)),
+            Rc::new(LispList::Nil),
         );
 
         // len test
@@ -227,30 +226,27 @@ mod tests {
         // tail test
         assert_eq!(
             list1.tail(),
-            LispList::Cons(
-                Type::Atom(Box::new("a".to_string())),
-                Box::new(LispList::Nil)
-            )
+            LispList::Cons(Type::Atom(Rc::new("a".to_string())), Rc::new(LispList::Nil))
         );
 
         // cons test
         {
-            let l1 = LispList::Cons(Type::Int(10), Box::new(LispList::Nil));
+            let l1 = LispList::Cons(Type::Int(10), Rc::new(LispList::Nil));
             assert_eq!(
                 l1.cons(&Type::Int(11)),
-                LispList::Cons(Type::Int(11), Box::new(l1))
+                LispList::Cons(Type::Int(11), Rc::new(l1))
             );
         }
 
         // partial_eqの挙動をついでにテスト。boxの中身もちゃんと見ている様子。
         {
-            let t1 = Type::Atom(Box::new("abc".to_string()));
-            let t2 = Type::Atom(Box::new("abc".to_string()));
+            let t1 = Type::Atom(Rc::new("abc".to_string()));
+            let t2 = Type::Atom(Rc::new("abc".to_string()));
             assert_eq!(t1, t2);
         }
         {
-            let t1 = Type::Atom(Box::new("abc".to_string()));
-            let t2 = Type::Atom(Box::new("ab".to_string()));
+            let t1 = Type::Atom(Rc::new("abc".to_string()));
+            let t2 = Type::Atom(Rc::new("ab".to_string()));
             assert_ne!(t1, t2);
         }
     }

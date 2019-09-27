@@ -1,5 +1,6 @@
 use crate::ltypes::*;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
@@ -74,7 +75,7 @@ fn list(l: LispList) -> Result<Type, EvalError> {
         tmp = tmp.tail();
     }
     newlist = newlist.reverse();
-    return Ok(Type::LispList(Box::new(newlist)));
+    return Ok(Type::LispList(Rc::new(newlist)));
 }
 
 // リストの先頭要素を取り出す
@@ -101,7 +102,7 @@ fn tail(l: LispList) -> Result<Type, EvalError> {
     }
     let a = l.head().unwrap();
     if let Type::LispList(b) = a {
-        return Ok(Type::LispList(Box::new(b.tail())));
+        return Ok(Type::LispList(Rc::new(b.tail())));
     } else {
         return Err(EvalError::TypeMismatch);
     }
@@ -224,11 +225,11 @@ mod tests {
             let exp = eval(Type::from("(list 1 2 3)".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::LispList(Box::new(LispList::Cons(
+                Ok(Type::LispList(Rc::new(LispList::Cons(
                     Type::Int(1),
-                    Box::new(LispList::Cons(
+                    Rc::new(LispList::Cons(
                         Type::Int(2),
-                        Box::new(LispList::Cons(Type::Int(3), Box::new(LispList::Nil)))
+                        Rc::new(LispList::Cons(Type::Int(3), Rc::new(LispList::Nil)))
                     ))
                 ))))
             );
@@ -244,9 +245,9 @@ mod tests {
             let exp = eval(Type::from("(tail (list 1 2 3))".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::LispList(Box::new(LispList::Cons(
+                Ok(Type::LispList(Rc::new(LispList::Cons(
                     Type::Int(2),
-                    Box::new(LispList::Cons(Type::Int(3), Box::new(LispList::Nil)))
+                    Rc::new(LispList::Cons(Type::Int(3), Rc::new(LispList::Nil)))
                 ))))
             );
         }
