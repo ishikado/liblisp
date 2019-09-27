@@ -3,7 +3,6 @@
 use std::rc::Rc;
 
 // リスト表現
-// TODO: iterator の実装を検討
 #[derive(Debug, Clone, PartialEq)]
 pub enum LispList {
     Cons(Type, Rc<LispList>),
@@ -23,7 +22,7 @@ impl Iterator for LispListIterator {
                 return None;
             },
             LispList::Cons(_, ref r) => {
-                self.list = (*r.clone()).clone();
+                self.list = (**r).clone();
                 return Some(res);
             }
         }
@@ -78,7 +77,7 @@ impl LispList {
         match self {
             &LispList::Nil => return self.clone(),
             &LispList::Cons(_, ref tail) => {
-                return (*tail.clone()).clone();
+                return (**tail).clone();
             }
         }
     }
@@ -268,7 +267,7 @@ mod tests {
             );
         }
 
-        // partial_eqの挙動をついでにテスト。boxの中身もちゃんと見ている様子。
+        // partial_eqの挙動をついでにテスト。rcの中身もちゃんと見ている様子。
         {
             let t1 = Type::Atom(Rc::new("abc".to_string()));
             let t2 = Type::Atom(Rc::new("abc".to_string()));
