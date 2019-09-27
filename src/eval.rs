@@ -34,19 +34,19 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             // まずは四則演算を扱いたい -> add sub mul div
             if let Some(head) = clist.head() {
-                let tail = clist.tail();
                 if let Type::Atom(fun_name) = head {
                     // 組み込み関数の適用
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
-                        let mut evaluated = LispList::new();
-                        let mut now = tail;
-                        while now != LispList::Nil {
-                            let c = eval(now.head().unwrap())?;
-                            evaluated = evaluated.cons(&c);
-                            now = now.tail();
-                        }
-                        evaluated = evaluated.reverse();
-                        let result = f(evaluated)?;
+                        // return Err(EvalError::Unexpected);
+                        // 引数をそれぞれ評価する
+                        let evaluated : LispList = 
+                            clist.tail()
+                            .try_fold(LispList::new(),
+                                      |acc, e| {
+                                          let res = eval(e.head().unwrap())?;
+                                          Ok(acc.cons(&res))
+                                      })?;
+                        let result = f(evaluated.reverse())?;
                         return Ok(result);
                     } else {
                         // TODO: ユーザ定義関数の適用

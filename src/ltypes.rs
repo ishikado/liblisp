@@ -10,6 +10,20 @@ pub enum LispList {
     Nil,
 }
 
+impl Iterator for LispList {
+    type Item = LispList;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            &mut LispList::Cons(_, ref tail) => {
+                Some((*tail.clone()).clone())
+            },
+            &mut LispList::Nil => {
+                None
+            }
+        }
+    }
+}
+
 // 許容する型一覧
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -46,8 +60,8 @@ impl LispList {
 
     pub fn tail(&self) -> LispList {
         match self {
-            LispList::Nil => return self.clone(),
-            LispList::Cons(_, ref tail) => {
+            &LispList::Nil => return self.clone(),
+            &LispList::Cons(_, ref tail) => {
                 return (*tail.clone()).clone();
             }
         }
