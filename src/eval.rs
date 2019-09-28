@@ -31,6 +31,9 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
             embeded_fn_table.insert("list", list);
             embeded_fn_table.insert("head", head);
             embeded_fn_table.insert("tail", tail);
+            embeded_fn_table.insert("gt", gt);
+            embeded_fn_table.insert("lt", lt);
+            embeded_fn_table.insert("eq", eq);
 
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             if let Some(head) = clist.head() {
@@ -156,12 +159,120 @@ fn arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
     return Ok(Type::Int(calc_result));
 }
 
+// > 演算を行う
+// a > b なら 1 、そうでないなら 0 を返す
+// Atom同士、Int同士の場合のみ演算を許容する
+fn gt(l :LispList) -> Result<Type, EvalError> {
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let a = l.head().unwrap();
+    let b = l.tail().head().unwrap();
+    
+    if let Type::Int(aint) = a {
+        if let Type::Int(bint) = b {
+            let res;
+            if aint > bint {
+                res = 1;
+            }
+            else{
+                res = 0;
+            }
+            return Ok(Type::Int(res));
+        }
+        else{
+            return Err(EvalError::TypeMismatch);
+        }
+    }
+    else if let Type::Atom(aatom) = a {
+        if let Type::Atom(batom) = b {
+            let res;
+            if aatom > batom {
+                res = 1;
+            }
+            else{
+                res = 0;
+            }
+            return Ok(Type::Int(res));
+        }
+        else{
+            return Err(EvalError::TypeMismatch);
+        }
+    }
+    else{
+        return Err(EvalError::TypeMismatch);
+    }
+}
+
+
+// < 演算を行う
+// a < b なら 1 、そうでないなら 0 を返す
+// Atom同士、Int同士の場合のみ演算を許容する
+fn lt(l :LispList) -> Result<Type, EvalError> {
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let a = l.head().unwrap();
+    let b = l.tail().head().unwrap();
+    
+    if let Type::Int(aint) = a {
+        if let Type::Int(bint) = b {
+            let res;
+            if aint < bint {
+                res = 1;
+            }
+            else{
+                res = 0;
+            }
+            return Ok(Type::Int(res));
+        }
+        else{
+            return Err(EvalError::TypeMismatch);
+        }
+    }
+    else if let Type::Atom(aatom) = a {
+        if let Type::Atom(batom) = b {
+            let res;
+            if aatom < batom {
+                res = 1;
+            }
+            else{
+                res = 0;
+            }
+            return Ok(Type::Int(res));
+        }
+        else{
+            return Err(EvalError::TypeMismatch);
+        }
+    }
+    else{
+        return Err(EvalError::TypeMismatch);
+    }
+}
+
+
+// == 演算を行う
+// a == b なら 1 、そうでないなら 0 を返す
+// Atom同士、Int同士の場合のみ演算を許容する
+fn eq(l :LispList) -> Result<Type, EvalError> {
+    let res1 = gt(l.clone())?;
+    let res2 = lt(l.clone())?;
+
+    if res1 == Type::Int(0) && res2 == Type::Int(0) {
+        return Ok(Type::Int(1));
+    }
+    return Ok(Type::Int(0));
+}
+
+
+
 #[cfg(test)]
 mod tests {
+    use crate::eval::*;
     #[test]
     fn arithmetic_tests() {
-        use crate::eval::*;
-
         // 四則演算の関数呼び出し
         {
             let exp = Type::try_from("(add 1 2)".as_bytes()).unwrap();
@@ -208,9 +319,60 @@ mod tests {
     }
 
     #[test]
-    fn list_tests() {
-        use crate::eval::*;
+    fn comparision_operation_tests() {
+        // gt
+        {
+            let exp = Type::try_from("(gt 3 2)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(1)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+        {
+            let exp = Type::try_from("(gt 2 3)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(0)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
 
+        // lt
+        {
+            let exp = Type::try_from("(lt 3 2)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(0)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+        {
+            let exp = Type::try_from("(lt 2 3)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(1)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+
+        // eq
+        {
+            let exp = Type::try_from("(eq 3 3)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(1)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+        {
+            let exp = Type::try_from("(eq 2 3)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(0)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+
+    }
+
+
+    #[test]
+    fn list_tests() {
         // list
         {
             let exp = eval(Type::try_from("(list 1 2 3)".as_bytes()).unwrap());
