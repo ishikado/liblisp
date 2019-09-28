@@ -40,8 +40,7 @@ fn eval_(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
         Type::Var(var) => {
             if let Some(val) = context.vartable.get(&*var) {
                 return Ok(val.clone());
-            }
-            else{
+            } else {
                 return Err(EvalError::UndefinedVariableReference);
             }
         }
@@ -61,8 +60,10 @@ fn eval_(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
             embeded_fn_table.insert("eq", eq);
 
             // 引数を関数内部で評価する組み込み関数のテーブル
-            let mut embeded_fn_table2: HashMap<&str, fn(LispList, &mut Context) -> Result<Type, EvalError>> =
-                HashMap::new();
+            let mut embeded_fn_table2: HashMap<
+                &str,
+                fn(LispList, &mut Context) -> Result<Type, EvalError>,
+            > = HashMap::new();
             embeded_fn_table2.insert("cond", cond);
             embeded_fn_table2.insert("set", set);
             embeded_fn_table2.insert("progn", progn);
@@ -114,24 +115,21 @@ fn wloop(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
 
     let cond = l.head().unwrap();
     let body = l.tail().head().unwrap();
-    
+
     loop {
         let evaluated_cond = eval_(cond.clone(), context)?;
         if let Type::Int(i) = evaluated_cond {
             if i == 0 {
                 // 便宜的にType::Int(0) を返す
                 return Ok(Type::Int(0));
-            }
-            else{
+            } else {
                 eval_(body.clone(), context)?;
             }
-        }
-        else{
+        } else {
             return Err(EvalError::TypeMismatch);
         }
     }
 }
-
 
 // リストの要素を順番に評価する
 // 最後に評価した値を戻り値とする
@@ -140,11 +138,10 @@ fn progn(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
         return Err(EvalError::BadArrity);
     }
     // 各要素を順番に評価していく
-    let res = l.into_iter()
-        .try_fold(Type::Int(0) /* dummy */, |_, e| {
-            let res = eval_(e.head().unwrap(), context)?;
-            return Ok(res);
-        })?;
+    let res = l.into_iter().try_fold(Type::Int(0) /* dummy */, |_, e| {
+        let res = eval_(e.head().unwrap(), context)?;
+        return Ok(res);
+    })?;
     return Ok(res);
 }
 
@@ -165,8 +162,7 @@ fn set(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     if let Type::Var(varstr) = var {
         context.vartable.insert((*varstr).clone(), val.clone());
         return Ok(val);
-    }
-    else{
+    } else {
         return Err(EvalError::TypeMismatch);
     }
 }
@@ -560,7 +556,8 @@ mod tests {
     #[test]
     fn progn_tests() {
         {
-            let exp = Type::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes()).unwrap();
+            let exp =
+                Type::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(40)) => assert!(true),
                 _ => assert!(false),
