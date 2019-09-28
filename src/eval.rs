@@ -32,7 +32,6 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
             embeded_fn_table.insert("tail", tail);
 
             // リスト形式をevalする時、先頭のatomを関数名として扱う
-            // まずは四則演算を扱いたい -> add sub mul div
             if let Some(head) = clist.head() {
                 if let Type::Atom(fun_name) = head {
                     // 組み込み関数の適用
