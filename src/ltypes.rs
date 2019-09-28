@@ -1,6 +1,7 @@
 // liblispで、lisp構造の表現に用いる型定義
 
 use std::rc::Rc;
+use std::convert::TryFrom;
 
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
@@ -17,7 +18,7 @@ impl Iterator for LispListIterator {
     type Item = LispList;
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.list.clone();
-        match self.list {
+        match &self.list {
             LispList::Nil => {
                 return None;
             },
@@ -64,10 +65,10 @@ impl LispList {
 
     pub fn head(&self) -> Option<Type> {
         match self {
-            &LispList::Nil => {
+            LispList::Nil => {
                 return None;
             }
-            &LispList::Cons(ref tp, _) => {
+            LispList::Cons(ref tp, _) => {
                 return Some(tp.clone());
             }
         }
@@ -75,18 +76,18 @@ impl LispList {
 
     pub fn tail(&self) -> LispList {
         match self {
-            &LispList::Nil => return self.clone(),
-            &LispList::Cons(_, ref tail) => {
+            LispList::Nil => return self.clone(),
+            LispList::Cons(_, ref tail) => {
                 return (**tail).clone();
             }
         }
     }
     pub fn len(&self) -> u32 {
         match self {
-            &LispList::Nil => {
+            LispList::Nil => {
                 return 0;
             }
-            &LispList::Cons(_, ref tail) => {
+            LispList::Cons(_, ref tail) => {
                 return tail.len() + 1;
             }
         }
@@ -109,15 +110,16 @@ impl LispList {
     }
 }
 
-impl Type {
-    // 文字列を受け取り、Type形式に変換する関数
-    // TODO 実装を TryFrm trait に変更する
-    pub fn from(bytes: &[u8]) -> Result<Type, TypeConversionError> {
+impl TryFrom<&[u8]> for Type {
+    type Error = TypeConversionError;
+    fn try_from(bytes: &[u8]) -> Result<Type, Self::Error> {
         let mut index = 0;
-        return Self::from_(&mut index, bytes);
+        return Self::try_from_(&mut index, bytes);
     }
+}
 
-    fn from_(index: &mut usize, bytes: &[u8]) -> Result<Type, TypeConversionError> {
+impl Type {
+    fn try_from_(index: &mut usize, bytes: &[u8]) -> Result<Type, TypeConversionError> {
         let head_ch = char::from(bytes[*index]);
         let mut list = LispList::new();
         // list
@@ -142,7 +144,7 @@ impl Type {
                 }
 
                 // 新しい要素を追加
-                let result = Self::from_(index, bytes)?;
+                let result = Self::try_from_(index, bytes)?;
                 list = list.cons(&result);
             }
         }
@@ -194,32 +196,32 @@ mod tests {
     fn type_tests() {
         use crate::ltypes::*;
 
-        assert_eq!(Type::from("12345".as_bytes()), Ok(Type::Int(12345)));
+        assert_eq!(Type::try_from("12345".as_bytes()), Ok(Type::Int(12345)));
         assert_eq!(
-            Type::from("atom".as_bytes()),
+            Type::try_from("atom".as_bytes()),
             Ok(Type::Atom(Rc::new("atom".to_string())))
         );
         assert_eq!(
-            Type::from("atom123".as_bytes()),
+            Type::try_from("atom123".as_bytes()),
             Ok(Type::Atom(Rc::new("atom123".to_string())))
         );
         assert_eq!(
-            Type::from("123atom".as_bytes()),
+            Type::try_from("123atom".as_bytes()),
             Err(TypeConversionError::InvalidToken)
         );
         assert_eq!(
-            Type::from("( )".as_bytes()),
+            Type::try_from("( )".as_bytes()),
             Ok(Type::LispList(Rc::new(LispList::Nil)))
         );
         assert_eq!(
-            Type::from("( ( ) )".as_bytes()),
+            Type::try_from("( ( ) )".as_bytes()),
             Ok(Type::LispList(Rc::new(LispList::Cons(
                 Type::LispList(Rc::new(LispList::Nil)),
                 Rc::new(LispList::Nil)
             ))))
         );
         assert_eq!(
-            Type::from("(atom ( ) )".as_bytes()),
+            Type::try_from("(atom ( ) )".as_bytes()),
             Ok(Type::LispList(Rc::new(LispList::Cons(
                 Type::Atom(Rc::new("atom".to_string())),
                 Rc::new(LispList::Cons(

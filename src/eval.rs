@@ -1,6 +1,7 @@
 use crate::ltypes::*;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
@@ -163,7 +164,7 @@ mod tests {
 
         // 四則演算の関数呼び出し
         {
-            let exp = Type::from("(add 1 2)".as_bytes()).unwrap();
+            let exp = Type::try_from("(add 1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(3)) => assert!(true),
                 _ => assert!(false),
@@ -171,7 +172,7 @@ mod tests {
         }
 
         {
-            let exp = Type::from("(sub 1 2)".as_bytes()).unwrap();
+            let exp = Type::try_from("(sub 1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(-1)) => assert!(true),
                 _ => assert!(false),
@@ -180,7 +181,7 @@ mod tests {
 
         // 関数をネストできる
         {
-            let exp = Type::from("(add (add (sub 1 2) 3) 4)".as_bytes()).unwrap();
+            let exp = Type::try_from("(add (add (sub 1 2) 3) 4)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(6)) => assert!(true),
                 _ => assert!(false),
@@ -189,7 +190,7 @@ mod tests {
 
         // 引数の数が足りない
         {
-            let exp = Type::from("(add 1)".as_bytes()).unwrap();
+            let exp = Type::try_from("(add 1)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(_) => assert!(false),
                 Err(e) => assert_eq!(EvalError::BadArrity, e),
@@ -198,7 +199,7 @@ mod tests {
 
         // atomが先頭要素でない
         {
-            let exp = Type::from("(1 2)".as_bytes()).unwrap();
+            let exp = Type::try_from("(1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(_) => assert!(false),
                 Err(e) => assert_eq!(EvalError::EvaluatingNonAtomHeadList, e),
@@ -212,7 +213,7 @@ mod tests {
 
         // list
         {
-            let exp = eval(Type::from("(list 1 2 3)".as_bytes()).unwrap());
+            let exp = eval(Type::try_from("(list 1 2 3)".as_bytes()).unwrap());
             assert_eq!(
                 exp,
                 Ok(Type::LispList(Rc::new(LispList::Cons(
@@ -226,13 +227,13 @@ mod tests {
         }
         // head
         {
-            let exp = eval(Type::from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
+            let exp = eval(Type::try_from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
             assert_eq!(exp, Ok(Type::Int(10)));
         }
 
         // tail
         {
-            let exp = eval(Type::from("(tail (list 1 2 3))".as_bytes()).unwrap());
+            let exp = eval(Type::try_from("(tail (list 1 2 3))".as_bytes()).unwrap());
             assert_eq!(
                 exp,
                 Ok(Type::LispList(Rc::new(LispList::Cons(
