@@ -9,6 +9,7 @@ pub enum EvalError {
     TypeMismatch,
     BadArrity,
     NotImplementation,
+    NotFoundFunctionName,
     DoHeadForNil,
     EvaluatingNonAtomHeadList,
 }
@@ -28,6 +29,8 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
+            embeded_fn_table.insert("mul", mul);
+            embeded_fn_table.insert("div", div);
             embeded_fn_table.insert("list", list);
             embeded_fn_table.insert("head", head);
             embeded_fn_table.insert("tail", tail);
@@ -38,8 +41,13 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             if let Some(head) = clist.head() {
                 if let Type::Atom(fun_name) = head {
+                    // cond は特別扱いで処理
+                    if *fun_name == "cond".to_string() {
+                        let r = cond(clist.tail())?;
+                        return Ok(r);
+                    }
                     // 組み込み関数の適用
-                    if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
+                    else if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
                         // 引数をそれぞれ評価する
                         let evaluated: LispList =
                             clist
@@ -53,7 +61,7 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                         return Ok(result);
                     } else {
                         // TODO: ユーザ定義関数の適用
-                        return Err(EvalError::Unexpected);
+                        return Err(EvalError::NotFoundFunctionName);
                     }
                 }
                 // Atomが先頭要素でない場合、評価できない
@@ -252,6 +260,36 @@ fn eq(l: LispList) -> Result<Type, EvalError> {
     return Ok(Type::Int(0));
 }
 
+// (条件 成立 不成立) という３つ組のリストを受け取り、
+// 条件の評価結果が 0以外 である場合、成立の値を評価する
+// 0である場合、不成立の値を評価する
+// なお、この3つの値は、cond に渡す前に評価しないこと
+// 成立か不成立どちらを実行するか、判明してから評価したいのが理由
+//（条件に関しては評価しても問題ないが、一貫性のため、評価しないこととする）
+fn cond(l: LispList) -> Result<Type, EvalError> {
+    if l.len() != 3 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let cond = l.head().unwrap();
+    let ok = l.tail().head().unwrap();
+    let ng = l.tail().tail().head().unwrap();
+
+    let r = eval(cond)?;
+
+    match r {
+        Type::Int(0) => {
+            return eval(ng);
+        }
+        Type::Int(_) => {
+            return eval(ok);
+        }
+        _ => {
+            return Err(EvalError::TypeMismatch);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::eval::*;
@@ -385,6 +423,24 @@ mod tests {
                     Rc::new(LispList::Cons(Type::Int(3), Rc::new(LispList::Nil)))
                 ))))
             );
+        }
+    }
+
+    #[test]
+    fn cond_tests() {
+        {
+            let exp = Type::try_from("(cond (eq 3 2) 10 (mul 20 10))".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(200)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+        {
+            let exp = Type::try_from("(cond (eq 3 3) (div 10 2) 20)".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(5)) => assert!(true),
+                _ => assert!(false),
+            }
         }
     }
 
