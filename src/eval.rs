@@ -407,6 +407,20 @@ mod tests {
                 ))))
             );
         }
+        {
+            let exp = eval(Type::try_from("(list a b c)".as_bytes()).unwrap());
+            assert_eq!(
+                exp,
+                Ok(Type::LispList(Rc::new(LispList::Cons(
+                    Type::Atom(Rc::new("a".to_string())),
+                    Rc::new(LispList::Cons(
+                        Type::Atom(Rc::new("b".to_string())),
+                        Rc::new(LispList::Cons(Type::Atom(Rc::new("c".to_string())), Rc::new(LispList::Nil)))
+                    ))
+                ))))
+            );
+        }
+
         // head
         {
             let exp = eval(Type::try_from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
