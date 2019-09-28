@@ -214,12 +214,10 @@ impl Type {
                 let var_len = var.as_bytes().len();
                 if asta_count == 2 && char::from(var.as_bytes()[var_len - 1]) == '*' {
                     return Ok(Type::Var(Rc::new(var)));
-                }
-                else{
+                } else {
                     return Err(TypeConversionError::InvalidToken);
                 }
-            }
-            else{
+            } else {
                 return Err(TypeConversionError::InvalidToken);
             }
         }
@@ -267,8 +265,10 @@ mod tests {
                 ))
             ))))
         );
-        assert_eq!(Type::try_from("*abcdefg*".as_bytes()),
-                   Ok(Type::Var(Rc::new("*abcdefg*".to_string()))));
+        assert_eq!(
+            Type::try_from("*abcdefg*".as_bytes()),
+            Ok(Type::Var(Rc::new("*abcdefg*".to_string())))
+        );
     }
 
     #[test]

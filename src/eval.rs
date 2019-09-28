@@ -11,15 +11,25 @@ pub enum EvalError {
     NotImplementation,
     NotFoundFunctionName,
     DoHeadForNil,
+    UndefinedVariableReference,
     EvaluatingNonAtomHeadList,
 }
 
-// 評価時に持ち回す情報を管理する
-struct Context{
-    // TODO: 変数テーブルを管理する
+// exp を評価する
+pub fn eval(exp: Type) -> Result<Type, EvalError> {
+    let mut context = Context {
+        vartable: HashMap::new(),
+    };
+    return eval_(exp, &mut context);
 }
 
-fn eval_(exp: Type, context : &mut Context) -> Result<Type, EvalError> {
+// 評価時に持ち回す情報を管理する
+struct Context {
+    // TODO: vartableのvalueにType::Varが含まれることはありえないので、Type::Varを含まないようなenumを新しく定義してvalueの型としたい
+    vartable: HashMap<String, Type>, // 変数テーブル
+}
+
+fn eval_(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
     match exp {
         Type::Int(_) => {
             return Ok(exp);
@@ -27,9 +37,13 @@ fn eval_(exp: Type, context : &mut Context) -> Result<Type, EvalError> {
         Type::Atom(_) => {
             return Ok(exp);
         }
-        Type::Var(_) => {
-            // TODO 変数の中身を返すようにする
-            return Ok(exp);
+        Type::Var(var) => {
+            if let Some(val) = context.vartable.get(&*var) {
+                return Ok(val.clone());
+            }
+            else{
+                return Err(EvalError::UndefinedVariableReference);
+            }
         }
         Type::LispList(clist) => {
             // 組み込み関数のテーブル
@@ -46,12 +60,20 @@ fn eval_(exp: Type, context : &mut Context) -> Result<Type, EvalError> {
             embeded_fn_table.insert("lt", lt);
             embeded_fn_table.insert("eq", eq);
 
+            // 引数を関数内部で評価する組み込み関数のテーブル
+            let mut embeded_fn_table2: HashMap<&str, fn(LispList, &mut Context) -> Result<Type, EvalError>> =
+                HashMap::new();
+            embeded_fn_table2.insert("cond", cond);
+            embeded_fn_table2.insert("set", set);
+            embeded_fn_table2.insert("progn", progn);
+            embeded_fn_table2.insert("while", wloop);
+
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             if let Some(head) = clist.head() {
                 if let Type::Atom(fun_name) = head {
-                    // cond は特別扱いで処理
-                    if *fun_name == "cond".to_string() {
-                        let r = cond(clist.tail(), context)?;
+                    // 引数を関数内部で評価する組み込み関数の適用
+                    if let Some(f) = embeded_fn_table2.get(fun_name.as_str()) {
+                        let r = f(clist.tail(), context)?;
                         return Ok(r);
                     }
                     // 組み込み関数の適用
@@ -83,10 +105,70 @@ fn eval_(exp: Type, context : &mut Context) -> Result<Type, EvalError> {
     }
 }
 
-// exp を評価する
-pub fn eval(exp: Type) -> Result<Type, EvalError> {
-    let mut context = Context{};
-    return eval_(exp, &mut context);
+// (wloop cond body) という形式の while loop
+// cond が 1 である限りループを続ける
+fn wloop(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let cond = l.head().unwrap();
+    let body = l.tail().head().unwrap();
+    
+    loop {
+        let evaluated_cond = eval_(cond.clone(), context)?;
+        if let Type::Int(i) = evaluated_cond {
+            if i == 0 {
+                // 便宜的にType::Int(0) を返す
+                return Ok(Type::Int(0));
+            }
+            else{
+                eval_(body.clone(), context)?;
+            }
+        }
+        else{
+            return Err(EvalError::TypeMismatch);
+        }
+    }
+}
+
+
+// リストの要素を順番に評価する
+// 最後に評価した値を戻り値とする
+fn progn(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+    if l.len() == 0 {
+        return Err(EvalError::BadArrity);
+    }
+    // 各要素を順番に評価していく
+    let res = l.into_iter()
+        .try_fold(Type::Int(0) /* dummy */, |_, e| {
+            let res = eval_(e.head().unwrap(), context)?;
+            return Ok(res);
+        })?;
+    return Ok(res);
+}
+
+// 変数に指定された値をセットする
+fn set(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+    if l.len() != 2 {
+        return Err(EvalError::BadArrity);
+    }
+
+    let var = l.head().unwrap();
+    let val = eval_(l.tail().head().unwrap(), context)?; // valはset関数に渡されてから評価する
+
+    // valはType::Var以外である必要がある
+    if let Type::Var(_) = val {
+        return Err(EvalError::TypeMismatch);
+    }
+    // varはType::Varである必要がある
+    if let Type::Var(varstr) = var {
+        context.vartable.insert((*varstr).clone(), val.clone());
+        return Ok(val);
+    }
+    else{
+        return Err(EvalError::TypeMismatch);
+    }
 }
 
 // リストを作成する
@@ -280,7 +362,7 @@ fn eq(l: LispList) -> Result<Type, EvalError> {
 // なお、この3つの値は、cond に渡す前に評価しないこと
 // 成立か不成立どちらを実行するか、判明してから評価したいのが理由
 //（条件に関しては評価しても問題ないが、一貫性のため、評価しないこととする）
-fn cond(l: LispList, context : &mut Context) -> Result<Type, EvalError> {
+fn cond(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() != 3 {
         return Err(EvalError::BadArrity);
     }
@@ -293,10 +375,10 @@ fn cond(l: LispList, context : &mut Context) -> Result<Type, EvalError> {
 
     match r {
         Type::Int(0) => {
-            return eval(ng);
+            return eval_(ng, context);
         }
         Type::Int(_) => {
-            return eval(ok);
+            return eval_(ok, context);
         }
         _ => {
             return Err(EvalError::TypeMismatch);
@@ -429,7 +511,10 @@ mod tests {
                     Type::Atom(Rc::new("a".to_string())),
                     Rc::new(LispList::Cons(
                         Type::Atom(Rc::new("b".to_string())),
-                        Rc::new(LispList::Cons(Type::Atom(Rc::new("c".to_string())), Rc::new(LispList::Nil)))
+                        Rc::new(LispList::Cons(
+                            Type::Atom(Rc::new("c".to_string())),
+                            Rc::new(LispList::Nil)
+                        ))
                     ))
                 ))))
             );
@@ -467,6 +552,29 @@ mod tests {
             let exp = Type::try_from("(cond (eq 3 3) (div 10 2) 20)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(5)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+    }
+
+    #[test]
+    fn progn_tests() {
+        {
+            let exp = Type::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Int(40)) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+    }
+
+    #[test]
+    fn while_tests() {
+        {
+            let exp = Type::try_from("(progn (set *i* 0) (set *a* 0) (while (lt *i* 10) (progn (set *a* (add *i* *a*)) (set *i* (add *i* 1)))) *a*)".as_bytes()).unwrap();
+            println!("{:?}", eval(exp.clone()));
+            match eval(exp) {
+                Ok(Type::Int(45)) => assert!(true),
                 _ => assert!(false),
             }
         }
