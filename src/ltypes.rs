@@ -1,7 +1,7 @@
 // liblispで、lisp構造の表現に用いる型定義
 
-use std::rc::Rc;
 use std::convert::TryFrom;
+use std::rc::Rc;
 
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
@@ -11,7 +11,7 @@ pub enum LispList {
 }
 
 pub struct LispListIterator {
-    list : LispList
+    list: LispList,
 }
 
 impl Iterator for LispListIterator {
@@ -21,7 +21,7 @@ impl Iterator for LispListIterator {
         match &self.list {
             LispList::Nil => {
                 return None;
-            },
+            }
             LispList::Cons(_, ref r) => {
                 self.list = (**r).clone();
                 return Some(res);
@@ -34,11 +34,9 @@ impl IntoIterator for LispList {
     type Item = LispList;
     type IntoIter = LispListIterator;
     fn into_iter(self) -> Self::IntoIter {
-        LispListIterator{list : self.clone()}
+        LispListIterator { list: self.clone() }
     }
 }
-
-
 
 // 許容する型一覧
 #[derive(Debug, Clone, PartialEq)]

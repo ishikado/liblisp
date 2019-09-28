@@ -1,7 +1,7 @@
 use crate::ltypes::*;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::convert::TryFrom;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
@@ -24,7 +24,8 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
         }
         Type::LispList(clist) => {
             // 組み込み関数のテーブル
-            let mut embeded_fn_table: HashMap<&str, fn(LispList) -> Result<Type, EvalError>> =HashMap::new();
+            let mut embeded_fn_table: HashMap<&str, fn(LispList) -> Result<Type, EvalError>> =
+                HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
             embeded_fn_table.insert("list", list);
@@ -37,14 +38,14 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                     // 組み込み関数の適用
                     if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
                         // 引数をそれぞれ評価する
-                        let evaluated : LispList = 
-                            clist.tail().into_iter()
-                            .try_fold(LispList::new(),
-                                      |acc, e| {
-                                          println!("{:?}", e);
-                                          let res = eval(e.head().unwrap())?;
-                                          Ok(acc.cons(&res))
-                                      })?;
+                        let evaluated: LispList =
+                            clist
+                                .tail()
+                                .into_iter()
+                                .try_fold(LispList::new(), |acc, e| {
+                                    let res = eval(e.head().unwrap())?;
+                                    Ok(acc.cons(&res))
+                                })?;
                         let result = f(evaluated.reverse())?;
                         return Ok(result);
                     } else {
