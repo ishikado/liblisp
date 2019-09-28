@@ -14,13 +14,21 @@ pub enum EvalError {
     EvaluatingNonAtomHeadList,
 }
 
-// exp を評価する
-pub fn eval(exp: Type) -> Result<Type, EvalError> {
+// 評価時に持ち回す情報を管理する
+struct Context{
+    // TODO: 変数テーブルを管理する
+}
+
+fn eval_(exp: Type, context : &mut Context) -> Result<Type, EvalError> {
     match exp {
         Type::Int(_) => {
             return Ok(exp);
         }
         Type::Atom(_) => {
+            return Ok(exp);
+        }
+        Type::Var(_) => {
+            // TODO 変数の中身を返すようにする
             return Ok(exp);
         }
         Type::LispList(clist) => {
@@ -43,7 +51,7 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                 if let Type::Atom(fun_name) = head {
                     // cond は特別扱いで処理
                     if *fun_name == "cond".to_string() {
-                        let r = cond(clist.tail())?;
+                        let r = cond(clist.tail(), context)?;
                         return Ok(r);
                     }
                     // 組み込み関数の適用
@@ -54,7 +62,7 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
                                 .tail()
                                 .into_iter()
                                 .try_fold(LispList::new(), |acc, e| {
-                                    let res = eval(e.head().unwrap())?;
+                                    let res = eval_(e.head().unwrap(), context)?;
                                     Ok(acc.cons(&res))
                                 })?;
                         let result = f(evaluated.reverse())?;
@@ -73,6 +81,12 @@ pub fn eval(exp: Type) -> Result<Type, EvalError> {
             }
         }
     }
+}
+
+// exp を評価する
+pub fn eval(exp: Type) -> Result<Type, EvalError> {
+    let mut context = Context{};
+    return eval_(exp, &mut context);
 }
 
 // リストを作成する
@@ -266,7 +280,7 @@ fn eq(l: LispList) -> Result<Type, EvalError> {
 // なお、この3つの値は、cond に渡す前に評価しないこと
 // 成立か不成立どちらを実行するか、判明してから評価したいのが理由
 //（条件に関しては評価しても問題ないが、一貫性のため、評価しないこととする）
-fn cond(l: LispList) -> Result<Type, EvalError> {
+fn cond(l: LispList, context : &mut Context) -> Result<Type, EvalError> {
     if l.len() != 3 {
         return Err(EvalError::BadArrity);
     }
@@ -275,7 +289,7 @@ fn cond(l: LispList) -> Result<Type, EvalError> {
     let ok = l.tail().head().unwrap();
     let ng = l.tail().tail().head().unwrap();
 
-    let r = eval(cond)?;
+    let r = eval_(cond, context)?;
 
     match r {
         Type::Int(0) => {

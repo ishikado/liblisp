@@ -43,6 +43,7 @@ impl IntoIterator for LispList {
 pub enum Type {
     Int(i32),
     Atom(Rc<String>), // Typeをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
+    Var(Rc<String>),
     LispList(Rc<LispList>),
 }
 
@@ -184,6 +185,44 @@ impl Type {
             }
             return Ok(Type::Atom(Rc::new(atom)));
         }
+        // var
+        // *と*で囲まれた形式を想定
+        else if head_ch == '*' {
+            let mut var = "*".to_string();
+            let mut asta_count = 1;
+            *index += 1;
+            let second_ch = char::from(bytes[*index]);
+            if second_ch.is_alphabetic() {
+                while *index < bytes.len() {
+                    let c = char::from(bytes[*index]);
+                    if c.is_ascii_digit() || c.is_alphabetic() || c == '*' {
+                        var.push(c);
+                        if c == '*' {
+                            asta_count += 1;
+                        }
+                    } else {
+                        // 括弧 or space or 改行 以外の文字が続いていたら異常
+                        if !(c == ')' || c == ' ' || c == '\n') {
+                            return Err(TypeConversionError::InvalidToken);
+                        }
+                        break;
+                    }
+                    *index += 1;
+                }
+                // varの先頭と末尾のみ * が存在
+                // 先頭が * になっているのは、ここ以前の条件分岐から明らかなので、末尾だけ調べる
+                let var_len = var.as_bytes().len();
+                if asta_count == 2 && char::from(var.as_bytes()[var_len - 1]) == '*' {
+                    return Ok(Type::Var(Rc::new(var)));
+                }
+                else{
+                    return Err(TypeConversionError::InvalidToken);
+                }
+            }
+            else{
+                return Err(TypeConversionError::InvalidToken);
+            }
+        }
         return Err(TypeConversionError::InvalidToken);
     }
 }
@@ -228,6 +267,8 @@ mod tests {
                 ))
             ))))
         );
+        assert_eq!(Type::try_from("*abcdefg*".as_bytes()),
+                   Ok(Type::Var(Rc::new("*abcdefg*".to_string()))));
     }
 
     #[test]
