@@ -162,101 +162,87 @@ fn arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
 // > 演算を行う
 // a > b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn gt(l :LispList) -> Result<Type, EvalError> {
+fn gt(l: LispList) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
 
     let a = l.head().unwrap();
     let b = l.tail().head().unwrap();
-    
+
     if let Type::Int(aint) = a {
         if let Type::Int(bint) = b {
             let res;
             if aint > bint {
                 res = 1;
-            }
-            else{
+            } else {
                 res = 0;
             }
             return Ok(Type::Int(res));
-        }
-        else{
+        } else {
             return Err(EvalError::TypeMismatch);
         }
-    }
-    else if let Type::Atom(aatom) = a {
+    } else if let Type::Atom(aatom) = a {
         if let Type::Atom(batom) = b {
             let res;
             if aatom > batom {
                 res = 1;
-            }
-            else{
+            } else {
                 res = 0;
             }
             return Ok(Type::Int(res));
-        }
-        else{
+        } else {
             return Err(EvalError::TypeMismatch);
         }
-    }
-    else{
+    } else {
         return Err(EvalError::TypeMismatch);
     }
 }
 
-
 // < 演算を行う
 // a < b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn lt(l :LispList) -> Result<Type, EvalError> {
+fn lt(l: LispList) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
 
     let a = l.head().unwrap();
     let b = l.tail().head().unwrap();
-    
+
     if let Type::Int(aint) = a {
         if let Type::Int(bint) = b {
             let res;
             if aint < bint {
                 res = 1;
-            }
-            else{
+            } else {
                 res = 0;
             }
             return Ok(Type::Int(res));
-        }
-        else{
+        } else {
             return Err(EvalError::TypeMismatch);
         }
-    }
-    else if let Type::Atom(aatom) = a {
+    } else if let Type::Atom(aatom) = a {
         if let Type::Atom(batom) = b {
             let res;
             if aatom < batom {
                 res = 1;
-            }
-            else{
+            } else {
                 res = 0;
             }
             return Ok(Type::Int(res));
-        }
-        else{
+        } else {
             return Err(EvalError::TypeMismatch);
         }
-    }
-    else{
+    } else {
         return Err(EvalError::TypeMismatch);
     }
 }
 
-
 // == 演算を行う
 // a == b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn eq(l :LispList) -> Result<Type, EvalError> {
+fn eq(l: LispList) -> Result<Type, EvalError> {
     let res1 = gt(l.clone())?;
     let res2 = lt(l.clone())?;
 
@@ -265,8 +251,6 @@ fn eq(l :LispList) -> Result<Type, EvalError> {
     }
     return Ok(Type::Int(0));
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -367,9 +351,7 @@ mod tests {
                 _ => assert!(false),
             }
         }
-
     }
-
 
     #[test]
     fn list_tests() {
