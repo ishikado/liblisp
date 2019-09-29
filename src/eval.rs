@@ -1,7 +1,9 @@
-use crate::ltypes::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use crate::ltypes::*;
+use crate::util::*;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
