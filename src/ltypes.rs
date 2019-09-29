@@ -113,7 +113,11 @@ impl TryFrom<&[u8]> for Type {
     type Error = TypeConversionError;
     fn try_from(bytes: &[u8]) -> Result<Type, Self::Error> {
         let mut index = 0;
-        return Self::try_from_(&mut index, bytes);
+        let res = Self::try_from_(&mut index, bytes);
+        if index != bytes.len() {
+            return Err(Self::Error::InvalidToken);
+        }
+        return res;
     }
 }
 
@@ -269,6 +273,12 @@ mod tests {
             Type::try_from("*abcdefg*".as_bytes()),
             Ok(Type::Var(Rc::new("*abcdefg*".to_string())))
         );
+
+        assert_eq!(Type::try_from("abc def".as_bytes()),
+                   Err(TypeConversionError::InvalidToken));
+        assert_eq!(Type::try_from("(abc def) ()".as_bytes()),
+                   Err(TypeConversionError::InvalidToken));
+
     }
 
     #[test]

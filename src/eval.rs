@@ -569,7 +569,6 @@ mod tests {
     fn while_tests() {
         {
             let exp = Type::try_from("(progn (set *i* 0) (set *a* 0) (while (lt *i* 10) (progn (set *a* (add *i* *a*)) (set *i* (add *i* 1)))) *a*)".as_bytes()).unwrap();
-            println!("{:?}", eval(exp.clone()));
             match eval(exp) {
                 Ok(Type::Int(45)) => assert!(true),
                 _ => assert!(false),
