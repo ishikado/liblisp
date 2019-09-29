@@ -3,26 +3,27 @@
 use std::convert::TryFrom;
 use std::rc::Rc;
 
+
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
-pub enum LispList {
-    Cons(Type, Rc<LispList>),
+pub enum ExpressionList {
+    Cons(Expression, Rc<ExpressionList>),
     Nil,
 }
 
-pub struct LispListIterator {
-    list: LispList,
+pub struct ExpressionListIterator {
+    list: ExpressionList,
 }
 
-impl Iterator for LispListIterator {
-    type Item = LispList;
+impl Iterator for ExpressionListIterator {
+    type Item = ExpressionList;
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.list.clone();
         match &self.list {
-            LispList::Nil => {
+            ExpressionList::Nil => {
                 return None;
             }
-            LispList::Cons(_, ref r) => {
+            ExpressionList::Cons(_, ref r) => {
                 self.list = (**r).clone();
                 return Some(res);
             }
@@ -30,74 +31,74 @@ impl Iterator for LispListIterator {
     }
 }
 
-impl IntoIterator for LispList {
-    type Item = LispList;
-    type IntoIter = LispListIterator;
+impl IntoIterator for ExpressionList {
+    type Item = ExpressionList;
+    type IntoIter = ExpressionListIterator;
     fn into_iter(self) -> Self::IntoIter {
-        LispListIterator { list: self.clone() }
+        ExpressionListIterator { list: self.clone() }
     }
 }
 
 // 許容する型一覧
 #[derive(Debug, Clone, PartialEq)]
-pub enum Type {
+pub enum Expression {
     Int(i32),
-    Atom(Rc<String>), // Typeをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
+    Atom(Rc<String>), // Expressionをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
     Var(Rc<String>),
-    LispList(Rc<LispList>),
+    ExpressionList(Rc<ExpressionList>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum TypeConversionError {
+pub enum ExpressionConversionError {
     InvalidToken,
 }
 
 // リスト操作を行う関数
-impl LispList {
-    pub fn new() -> LispList {
-        return LispList::Nil;
+impl ExpressionList {
+    pub fn new() -> ExpressionList {
+        return ExpressionList::Nil;
     }
 
-    pub fn cons(&self, tp: &Type) -> LispList {
-        return LispList::Cons(tp.clone(), Rc::new(self.clone()));
+    pub fn cons(&self, tp: &Expression) -> ExpressionList {
+        return ExpressionList::Cons(tp.clone(), Rc::new(self.clone()));
     }
 
-    pub fn head(&self) -> Option<Type> {
+    pub fn head(&self) -> Option<Expression> {
         match self {
-            LispList::Nil => {
+            ExpressionList::Nil => {
                 return None;
             }
-            LispList::Cons(ref tp, _) => {
+            ExpressionList::Cons(ref tp, _) => {
                 return Some(tp.clone());
             }
         }
     }
 
-    pub fn tail(&self) -> LispList {
+    pub fn tail(&self) -> ExpressionList {
         match self {
-            LispList::Nil => return self.clone(),
-            LispList::Cons(_, ref tail) => {
+            ExpressionList::Nil => return self.clone(),
+            ExpressionList::Cons(_, ref tail) => {
                 return (**tail).clone();
             }
         }
     }
     pub fn len(&self) -> u32 {
         match self {
-            LispList::Nil => {
+            ExpressionList::Nil => {
                 return 0;
             }
-            LispList::Cons(_, ref tail) => {
+            ExpressionList::Cons(_, ref tail) => {
                 return tail.len() + 1;
             }
         }
     }
 
     // reverse自要素をreverseしたlistを返す
-    pub fn reverse(&self) -> LispList {
-        return Self::reverse_(self.clone(), LispList::new());
+    pub fn reverse(&self) -> ExpressionList {
+        return Self::reverse_(self.clone(), ExpressionList::new());
     }
 
-    fn reverse_(old: LispList, new: LispList) -> LispList {
+    fn reverse_(old: ExpressionList, new: ExpressionList) -> ExpressionList {
         match old.head() {
             None => {
                 return new;
@@ -109,9 +110,9 @@ impl LispList {
     }
 }
 
-impl TryFrom<&[u8]> for Type {
-    type Error = TypeConversionError;
-    fn try_from(bytes: &[u8]) -> Result<Type, Self::Error> {
+impl TryFrom<&[u8]> for Expression {
+    type Error = ExpressionConversionError;
+    fn try_from(bytes: &[u8]) -> Result<Expression, Self::Error> {
         let mut index = 0;
         let res = Self::try_from_(&mut index, bytes);
         if index != bytes.len() {
@@ -121,10 +122,10 @@ impl TryFrom<&[u8]> for Type {
     }
 }
 
-impl Type {
-    fn try_from_(index: &mut usize, bytes: &[u8]) -> Result<Type, TypeConversionError> {
+impl Expression {
+    fn try_from_(index: &mut usize, bytes: &[u8]) -> Result<Expression, ExpressionConversionError> {
         let head_ch = char::from(bytes[*index]);
-        let mut list = LispList::new();
+        let mut list = ExpressionList::new();
         // list
         if head_ch == '(' {
             *index += 1;
@@ -143,7 +144,7 @@ impl Type {
                 } else if char::from(bytes[*index]) == ')' {
                     // end
                     *index += 1;
-                    return Ok(Type::LispList(Rc::new(list.reverse())));
+                    return Ok(Expression::ExpressionList(Rc::new(list.reverse())));
                 }
 
                 // 新しい要素を追加
@@ -162,13 +163,13 @@ impl Type {
                 } else {
                     // 括弧 or space or 改行 以外の文字が続いていたら異常
                     if !(c == ')' || c == ' ' || c == '\n') {
-                        return Err(TypeConversionError::InvalidToken);
+                        return Err(ExpressionConversionError::InvalidToken);
                     }
                     break;
                 }
                 *index += 1;
             }
-            return Ok(Type::Int(num));
+            return Ok(Expression::Int(num));
         }
         // atom
         // atomは 簡単のために、alphabetから始まり、alphabetと数字のみ含むものとする
@@ -181,13 +182,13 @@ impl Type {
                 } else {
                     // 括弧 or space or 改行 以外の文字が続いていたら異常
                     if !(c == ')' || c == ' ' || c == '\n') {
-                        return Err(TypeConversionError::InvalidToken);
+                        return Err(ExpressionConversionError::InvalidToken);
                     }
                     break;
                 }
                 *index += 1;
             }
-            return Ok(Type::Atom(Rc::new(atom)));
+            return Ok(Expression::Atom(Rc::new(atom)));
         }
         // var
         // *と*で囲まれた形式を想定
@@ -207,7 +208,7 @@ impl Type {
                     } else {
                         // 括弧 or space or 改行 以外の文字が続いていたら異常
                         if !(c == ')' || c == ' ' || c == '\n') {
-                            return Err(TypeConversionError::InvalidToken);
+                            return Err(ExpressionConversionError::InvalidToken);
                         }
                         break;
                     }
@@ -217,15 +218,15 @@ impl Type {
                 // 先頭が * になっているのは、ここ以前の条件分岐から明らかなので、末尾だけ調べる
                 let var_len = var.as_bytes().len();
                 if asta_count == 2 && char::from(var.as_bytes()[var_len - 1]) == '*' {
-                    return Ok(Type::Var(Rc::new(var)));
+                    return Ok(Expression::Var(Rc::new(var)));
                 } else {
-                    return Err(TypeConversionError::InvalidToken);
+                    return Err(ExpressionConversionError::InvalidToken);
                 }
             } else {
-                return Err(TypeConversionError::InvalidToken);
+                return Err(ExpressionConversionError::InvalidToken);
             }
         }
-        return Err(TypeConversionError::InvalidToken);
+        return Err(ExpressionConversionError::InvalidToken);
     }
 }
 
@@ -235,52 +236,52 @@ mod tests {
     fn type_tests() {
         use crate::ltypes::*;
 
-        assert_eq!(Type::try_from("12345".as_bytes()), Ok(Type::Int(12345)));
+        assert_eq!(Expression::try_from("12345".as_bytes()), Ok(Expression::Int(12345)));
         assert_eq!(
-            Type::try_from("atom".as_bytes()),
-            Ok(Type::Atom(Rc::new("atom".to_string())))
+            Expression::try_from("atom".as_bytes()),
+            Ok(Expression::Atom(Rc::new("atom".to_string())))
         );
         assert_eq!(
-            Type::try_from("atom123".as_bytes()),
-            Ok(Type::Atom(Rc::new("atom123".to_string())))
+            Expression::try_from("atom123".as_bytes()),
+            Ok(Expression::Atom(Rc::new("atom123".to_string())))
         );
         assert_eq!(
-            Type::try_from("123atom".as_bytes()),
-            Err(TypeConversionError::InvalidToken)
+            Expression::try_from("123atom".as_bytes()),
+            Err(ExpressionConversionError::InvalidToken)
         );
         assert_eq!(
-            Type::try_from("( )".as_bytes()),
-            Ok(Type::LispList(Rc::new(LispList::Nil)))
+            Expression::try_from("( )".as_bytes()),
+            Ok(Expression::ExpressionList(Rc::new(ExpressionList::Nil)))
         );
         assert_eq!(
-            Type::try_from("( ( ) )".as_bytes()),
-            Ok(Type::LispList(Rc::new(LispList::Cons(
-                Type::LispList(Rc::new(LispList::Nil)),
-                Rc::new(LispList::Nil)
+            Expression::try_from("( ( ) )".as_bytes()),
+            Ok(Expression::ExpressionList(Rc::new(ExpressionList::Cons(
+                Expression::ExpressionList(Rc::new(ExpressionList::Nil)),
+                Rc::new(ExpressionList::Nil)
             ))))
         );
         assert_eq!(
-            Type::try_from("(atom ( ) )".as_bytes()),
-            Ok(Type::LispList(Rc::new(LispList::Cons(
-                Type::Atom(Rc::new("atom".to_string())),
-                Rc::new(LispList::Cons(
-                    Type::LispList(Rc::new(LispList::Nil)),
-                    Rc::new(LispList::Nil)
+            Expression::try_from("(atom ( ) )".as_bytes()),
+            Ok(Expression::ExpressionList(Rc::new(ExpressionList::Cons(
+                Expression::Atom(Rc::new("atom".to_string())),
+                Rc::new(ExpressionList::Cons(
+                    Expression::ExpressionList(Rc::new(ExpressionList::Nil)),
+                    Rc::new(ExpressionList::Nil)
                 ))
             ))))
         );
         assert_eq!(
-            Type::try_from("*abcdefg*".as_bytes()),
-            Ok(Type::Var(Rc::new("*abcdefg*".to_string())))
+            Expression::try_from("*abcdefg*".as_bytes()),
+            Ok(Expression::Var(Rc::new("*abcdefg*".to_string())))
         );
 
         assert_eq!(
-            Type::try_from("abc def".as_bytes()),
-            Err(TypeConversionError::InvalidToken)
+            Expression::try_from("abc def".as_bytes()),
+            Err(ExpressionConversionError::InvalidToken)
         );
         assert_eq!(
-            Type::try_from("(abc def) ()".as_bytes()),
-            Err(TypeConversionError::InvalidToken)
+            Expression::try_from("(abc def) ()".as_bytes()),
+            Err(ExpressionConversionError::InvalidToken)
         );
     }
 
@@ -288,16 +289,16 @@ mod tests {
     fn lisplist_tests() {
         use crate::ltypes::*;
 
-        let list1 = LispList::Cons(
-            Type::Int(32),
-            Rc::new(LispList::Cons(
-                Type::Atom(Rc::new("a".to_string())),
-                Rc::new(LispList::Nil),
+        let list1 = ExpressionList::Cons(
+            Expression::Int(32),
+            Rc::new(ExpressionList::Cons(
+                Expression::Atom(Rc::new("a".to_string())),
+                Rc::new(ExpressionList::Nil),
             )),
         );
-        let list2 = LispList::Cons(
-            Type::LispList(Rc::new(LispList::Nil)),
-            Rc::new(LispList::Nil),
+        let list2 = ExpressionList::Cons(
+            Expression::ExpressionList(Rc::new(ExpressionList::Nil)),
+            Rc::new(ExpressionList::Nil),
         );
 
         // len test
@@ -305,32 +306,32 @@ mod tests {
         assert_eq!(list2.len(), 1);
 
         // head test
-        assert_eq!(list1.head(), Some(Type::Int(32)));
+        assert_eq!(list1.head(), Some(Expression::Int(32)));
 
         // tail test
         assert_eq!(
             list1.tail(),
-            LispList::Cons(Type::Atom(Rc::new("a".to_string())), Rc::new(LispList::Nil))
+            ExpressionList::Cons(Expression::Atom(Rc::new("a".to_string())), Rc::new(ExpressionList::Nil))
         );
 
         // cons test
         {
-            let l1 = LispList::Cons(Type::Int(10), Rc::new(LispList::Nil));
+            let l1 = ExpressionList::Cons(Expression::Int(10), Rc::new(ExpressionList::Nil));
             assert_eq!(
-                l1.cons(&Type::Int(11)),
-                LispList::Cons(Type::Int(11), Rc::new(l1))
+                l1.cons(&Expression::Int(11)),
+                ExpressionList::Cons(Expression::Int(11), Rc::new(l1))
             );
         }
 
         // partial_eqの挙動をついでにテスト。rcの中身もちゃんと見ている様子。
         {
-            let t1 = Type::Atom(Rc::new("abc".to_string()));
-            let t2 = Type::Atom(Rc::new("abc".to_string()));
+            let t1 = Expression::Atom(Rc::new("abc".to_string()));
+            let t2 = Expression::Atom(Rc::new("abc".to_string()));
             assert_eq!(t1, t2);
         }
         {
-            let t1 = Type::Atom(Rc::new("abc".to_string()));
-            let t2 = Type::Atom(Rc::new("ab".to_string()));
+            let t1 = Expression::Atom(Rc::new("abc".to_string()));
+            let t2 = Expression::Atom(Rc::new("ab".to_string()));
             assert_ne!(t1, t2);
         }
     }

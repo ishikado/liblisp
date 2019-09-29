@@ -15,8 +15,125 @@ pub enum EvalError {
     EvaluatingNonAtomHeadList,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    Int(i32),
+    Atom(Rc<String>),
+    List(Rc<List>),
+}
+
+
+// リスト表現
+#[derive(Debug, Clone, PartialEq)]
+pub enum List {
+    Cons(Type, Rc<List>),
+    Nil,
+}
+
+pub struct ListIterator {
+    list: List,
+}
+
+
+impl Iterator for ListIterator {
+    type Item = List;
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.list.clone();
+        match &self.list {
+            List::Nil => {
+                return None;
+            }
+            List::Cons(_, ref r) => {
+                self.list = (**r).clone();
+                return Some(res);
+            }
+        }
+    }
+}
+
+impl IntoIterator for List {
+    type Item = List;
+    type IntoIter = ListIterator;
+    fn into_iter(self) -> Self::IntoIter {
+        ListIterator { list: self.clone() }
+    }
+}
+
+
+impl List {
+    fn try_from(l : ExpressionList, context: &mut Context) -> Result<List, EvalError> {
+        match l {
+            ExpressionList::Nil => {
+                return Ok(List::Nil);
+            }
+            ExpressionList::Cons(e, left) => {
+                let r = eval_with_context(e, context)?;
+                let r2 = Self::try_from((*left).clone(), context)?;
+                return Ok(List::Cons(r, Rc::new(r2)));
+            }
+        }
+    }
+
+    pub fn new() -> List {
+        return List::Nil;
+    }
+
+    pub fn cons(&self, tp: &Type) -> List {
+        return List::Cons(tp.clone(), Rc::new(self.clone()));
+    }
+
+    pub fn head(&self) -> Option<Type> {
+        match self {
+            List::Nil => {
+                return None;
+            }
+            List::Cons(ref tp, _) => {
+                return Some(tp.clone());
+            }
+        }
+    }
+
+    pub fn tail(&self) -> List {
+        match self {
+            List::Nil => return self.clone(),
+            List::Cons(_, ref tail) => {
+                return (**tail).clone();
+            }
+        }
+    }
+    pub fn len(&self) -> u32 {
+        match self {
+            List::Nil => {
+                return 0;
+            }
+            List::Cons(_, ref tail) => {
+                return tail.len() + 1;
+            }
+        }
+    }
+
+    // reverse自要素をreverseしたlistを返す
+    pub fn reverse(&self) -> List {
+        return Self::reverse_(self.clone(), List::new());
+    }
+
+    fn reverse_(old: List, new: List) -> List {
+        match old.head() {
+            None => {
+                return new;
+            }
+            Some(hd) => {
+                return Self::reverse_(old.tail(), new.cons(&hd));
+            }
+        }
+    }
+
+
+}
+
+
 // exp を評価する
-pub fn eval(exp: Type) -> Result<Type, EvalError> {
+pub fn eval(exp: Expression) -> Result<Type, EvalError> {
     let mut context = Context::new();
     return eval_with_context(exp, &mut context);
 }
@@ -36,24 +153,24 @@ impl Context {
 }
 
 // exp を、 context 付きで評価する
-pub fn eval_with_context(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
+pub fn eval_with_context(exp: Expression, context: &mut Context) -> Result<Type, EvalError> {
     match exp {
-        Type::Int(_) => {
-            return Ok(exp);
+        Expression::Int(i) => {
+            return Ok(Type::Int(i));
         }
-        Type::Atom(_) => {
-            return Ok(exp);
+        Expression::Atom(a) => {
+            return Ok(Type::Atom(a));
         }
-        Type::Var(var) => {
+        Expression::Var(var) => {
             if let Some(val) = context.vartable.get(&*var) {
                 return Ok(val.clone());
             } else {
                 return Err(EvalError::UndefinedVariableReference);
             }
         }
-        Type::LispList(clist) => {
+        Expression::ExpressionList(clist) => {
             // 組み込み関数のテーブル
-            let mut embeded_fn_table: HashMap<&str, fn(LispList) -> Result<Type, EvalError>> =
+            let mut embeded_fn_table: HashMap<&str, fn(List) -> Result<Type, EvalError>> =
                 HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
@@ -69,7 +186,7 @@ pub fn eval_with_context(exp: Type, context: &mut Context) -> Result<Type, EvalE
             // 引数を関数内部で評価する組み込み関数のテーブル
             let mut embeded_fn_table2: HashMap<
                 &str,
-                fn(LispList, &mut Context) -> Result<Type, EvalError>,
+                fn(ExpressionList, &mut Context) -> Result<Type, EvalError>,
             > = HashMap::new();
             embeded_fn_table2.insert("cond", cond);
             embeded_fn_table2.insert("set", set);
@@ -78,7 +195,7 @@ pub fn eval_with_context(exp: Type, context: &mut Context) -> Result<Type, EvalE
 
             // リスト形式をevalする時、先頭のatomを関数名として扱う
             if let Some(head) = clist.head() {
-                if let Type::Atom(fun_name) = head {
+                if let Expression::Atom(fun_name) = head {
                     // 引数を関数内部で評価する組み込み関数の適用
                     if let Some(f) = embeded_fn_table2.get(fun_name.as_str()) {
                         let r = f(clist.tail(), context)?;
@@ -87,11 +204,11 @@ pub fn eval_with_context(exp: Type, context: &mut Context) -> Result<Type, EvalE
                     // 組み込み関数の適用
                     else if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
                         // 引数をそれぞれ評価する
-                        let evaluated: LispList =
+                        let evaluated: List =
                             clist
                                 .tail()
                                 .into_iter()
-                                .try_fold(LispList::new(), |acc, e| {
+                                .try_fold(List::new(), |acc, e| {
                                     let res = eval_with_context(e.head().unwrap(), context)?;
                                     Ok(acc.cons(&res))
                                 })?;
@@ -115,7 +232,7 @@ pub fn eval_with_context(exp: Type, context: &mut Context) -> Result<Type, EvalE
 
 // (wloop cond body) という形式の while loop
 // cond が 1 である限りループを続ける
-fn wloop(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+fn wloop(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -140,7 +257,7 @@ fn wloop(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
 
 // リストの要素を順番に評価する
 // 最後に評価した値を戻り値とする
-fn progn(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+fn progn(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() == 0 {
         return Err(EvalError::BadArrity);
     }
@@ -153,7 +270,7 @@ fn progn(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
 }
 
 // 変数に指定された値をセットする
-fn set(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+fn set(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -161,12 +278,8 @@ fn set(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     let var = l.head().unwrap();
     let val = eval_with_context(l.tail().head().unwrap(), context)?; // valはset関数に渡されてから評価する
 
-    // valはType::Var以外である必要がある
-    if let Type::Var(_) = val {
-        return Err(EvalError::TypeMismatch);
-    }
-    // varはType::Varである必要がある
-    if let Type::Var(varstr) = var {
+    // varは Var である必要がある
+    if let Expression::Var(varstr) = var {
         context.vartable.insert((*varstr).clone(), val.clone());
         return Ok(val);
     } else {
@@ -175,17 +288,17 @@ fn set(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
 }
 
 // リストを作成する
-fn list(l: LispList) -> Result<Type, EvalError> {
-    return Ok(Type::LispList(Rc::new(l)));
+fn list(l: List) -> Result<Type, EvalError> {
+    return Ok(Type::List(Rc::new(l)));
 }
 
 // リストの先頭要素を取り出す
-fn head(l: LispList) -> Result<Type, EvalError> {
+fn head(l: List) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
     let a = l.head().unwrap();
-    if let Type::LispList(b) = a {
+    if let Type::List(b) = a {
         if let Some(c) = b.head() {
             return Ok(c);
         } else {
@@ -197,13 +310,13 @@ fn head(l: LispList) -> Result<Type, EvalError> {
 }
 
 // リストの先頭要素外を取り除いたものを返す
-fn tail(l: LispList) -> Result<Type, EvalError> {
+fn tail(l: List) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
     let a = l.head().unwrap();
-    if let Type::LispList(b) = a {
-        return Ok(Type::LispList(Rc::new(b.tail())));
+    if let Type::List(b) = a {
+        return Ok(Type::List(Rc::new(b.tail())));
     } else {
         return Err(EvalError::TypeMismatch);
     }
@@ -217,24 +330,24 @@ enum ArithType {
 }
 
 // 加算を行う
-fn add(l: LispList) -> Result<Type, EvalError> {
+fn add(l: List) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Add);
 }
 // 減算を行う
-fn sub(l: LispList) -> Result<Type, EvalError> {
+fn sub(l: List) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Sub);
 }
 // 乗算を行う
-fn mul(l: LispList) -> Result<Type, EvalError> {
+fn mul(l: List) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Mul);
 }
 // 除算を行う
-fn div(l: LispList) -> Result<Type, EvalError> {
+fn div(l: List) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Div);
 }
 
 // 加減乗除の演算を行う
-fn arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
+fn arith_op(l: List, tp: ArithType) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -269,7 +382,7 @@ fn arith_op(l: LispList, tp: ArithType) -> Result<Type, EvalError> {
 // > 演算を行う
 // a > b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn gt(l: LispList) -> Result<Type, EvalError> {
+fn gt(l: List) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -309,7 +422,7 @@ fn gt(l: LispList) -> Result<Type, EvalError> {
 // < 演算を行う
 // a < b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn lt(l: LispList) -> Result<Type, EvalError> {
+fn lt(l: List) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -339,7 +452,7 @@ fn lt(l: LispList) -> Result<Type, EvalError> {
 // == 演算を行う
 // a == b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn eq(l: LispList) -> Result<Type, EvalError> {
+fn eq(l: List) -> Result<Type, EvalError> {
     let res1 = gt(l.clone())?;
     let res2 = lt(l.clone())?;
 
@@ -355,7 +468,7 @@ fn eq(l: LispList) -> Result<Type, EvalError> {
 // なお、この3つの値は、cond に渡す前に評価しないこと
 // 成立か不成立どちらを実行するか、判明してから評価したいのが理由
 //（条件に関しては評価しても問題ないが、一貫性のため、評価しないこととする）
-fn cond(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
+fn cond(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() != 3 {
         return Err(EvalError::BadArrity);
     }
@@ -386,7 +499,7 @@ mod tests {
     fn arithmetic_tests() {
         // 四則演算の関数呼び出し
         {
-            let exp = Type::try_from("(add 1 2)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(add 1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(3)) => assert!(true),
                 _ => assert!(false),
@@ -394,7 +507,7 @@ mod tests {
         }
 
         {
-            let exp = Type::try_from("(sub 1 2)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(sub 1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(-1)) => assert!(true),
                 _ => assert!(false),
@@ -403,7 +516,7 @@ mod tests {
 
         // 関数をネストできる
         {
-            let exp = Type::try_from("(add (add (sub 1 2) 3) 4)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(add (add (sub 1 2) 3) 4)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(6)) => assert!(true),
                 _ => assert!(false),
@@ -412,7 +525,7 @@ mod tests {
 
         // 引数の数が足りない
         {
-            let exp = Type::try_from("(add 1)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(add 1)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(_) => assert!(false),
                 Err(e) => assert_eq!(EvalError::BadArrity, e),
@@ -421,7 +534,7 @@ mod tests {
 
         // atomが先頭要素でない
         {
-            let exp = Type::try_from("(1 2)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(1 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(_) => assert!(false),
                 Err(e) => assert_eq!(EvalError::EvaluatingNonAtomHeadList, e),
@@ -433,14 +546,14 @@ mod tests {
     fn comparision_operation_tests() {
         // gt
         {
-            let exp = Type::try_from("(gt 3 2)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(gt 3 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(1)) => assert!(true),
                 _ => assert!(false),
             }
         }
         {
-            let exp = Type::try_from("(gt 2 3)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(gt 2 3)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(0)) => assert!(true),
                 _ => assert!(false),
@@ -449,14 +562,14 @@ mod tests {
 
         // lt
         {
-            let exp = Type::try_from("(lt 3 2)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(lt 3 2)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(0)) => assert!(true),
                 _ => assert!(false),
             }
         }
         {
-            let exp = Type::try_from("(lt 2 3)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(lt 2 3)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(1)) => assert!(true),
                 _ => assert!(false),
@@ -465,14 +578,14 @@ mod tests {
 
         // eq
         {
-            let exp = Type::try_from("(eq 3 3)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(eq 3 3)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(1)) => assert!(true),
                 _ => assert!(false),
             }
         }
         {
-            let exp = Type::try_from("(eq 2 3)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(eq 2 3)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(0)) => assert!(true),
                 _ => assert!(false),
@@ -484,29 +597,29 @@ mod tests {
     fn list_tests() {
         // list
         {
-            let exp = eval(Type::try_from("(list 1 2 3)".as_bytes()).unwrap());
+            let exp = eval(Expression::try_from("(list 1 2 3)".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::LispList(Rc::new(LispList::Cons(
+                Ok(Type::List(Rc::new(List::Cons(
                     Type::Int(1),
-                    Rc::new(LispList::Cons(
+                    Rc::new(List::Cons(
                         Type::Int(2),
-                        Rc::new(LispList::Cons(Type::Int(3), Rc::new(LispList::Nil)))
+                        Rc::new(List::Cons(Type::Int(3), Rc::new(List::Nil)))
                     ))
                 ))))
             );
         }
         {
-            let exp = eval(Type::try_from("(list a b c)".as_bytes()).unwrap());
+            let exp = eval(Expression::try_from("(list a b c)".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::LispList(Rc::new(LispList::Cons(
+                Ok(Type::List(Rc::new(List::Cons(
                     Type::Atom(Rc::new("a".to_string())),
-                    Rc::new(LispList::Cons(
+                    Rc::new(List::Cons(
                         Type::Atom(Rc::new("b".to_string())),
-                        Rc::new(LispList::Cons(
+                        Rc::new(List::Cons(
                             Type::Atom(Rc::new("c".to_string())),
-                            Rc::new(LispList::Nil)
+                            Rc::new(List::Nil)
                         ))
                     ))
                 ))))
@@ -515,18 +628,18 @@ mod tests {
 
         // head
         {
-            let exp = eval(Type::try_from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
+            let exp = eval(Expression::try_from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
             assert_eq!(exp, Ok(Type::Int(10)));
         }
 
         // tail
         {
-            let exp = eval(Type::try_from("(tail (list 1 2 3))".as_bytes()).unwrap());
+            let exp = eval(Expression::try_from("(tail (list 1 2 3))".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::LispList(Rc::new(LispList::Cons(
+                Ok(Type::List(Rc::new(List::Cons(
                     Type::Int(2),
-                    Rc::new(LispList::Cons(Type::Int(3), Rc::new(LispList::Nil)))
+                    Rc::new(List::Cons(Type::Int(3), Rc::new(List::Nil)))
                 ))))
             );
         }
@@ -535,14 +648,14 @@ mod tests {
     #[test]
     fn cond_tests() {
         {
-            let exp = Type::try_from("(cond (eq 3 2) 10 (mul 20 10))".as_bytes()).unwrap();
+            let exp = Expression::try_from("(cond (eq 3 2) 10 (mul 20 10))".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(200)) => assert!(true),
                 _ => assert!(false),
             }
         }
         {
-            let exp = Type::try_from("(cond (eq 3 3) (div 10 2) 20)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(cond (eq 3 3) (div 10 2) 20)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(5)) => assert!(true),
                 _ => assert!(false),
@@ -554,7 +667,7 @@ mod tests {
     fn progn_tests() {
         {
             let exp =
-                Type::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes()).unwrap();
+                Expression::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(40)) => assert!(true),
                 _ => assert!(false),
@@ -565,7 +678,7 @@ mod tests {
     #[test]
     fn while_tests() {
         {
-            let exp = Type::try_from("(progn (set *i* 0) (set *a* 0) (while (lt *i* 10) (progn (set *a* (add *i* *a*)) (set *i* (add *i* 1)))) *a*)".as_bytes()).unwrap();
+            let exp = Expression::try_from("(progn (set *i* 0) (set *a* 0) (while (lt *i* 10) (progn (set *a* (add *i* *a*)) (set *i* (add *i* 1)))) *a*)".as_bytes()).unwrap();
             match eval(exp) {
                 Ok(Type::Int(45)) => assert!(true),
                 _ => assert!(false),
