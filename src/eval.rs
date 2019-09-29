@@ -17,19 +17,26 @@ pub enum EvalError {
 
 // exp を評価する
 pub fn eval(exp: Type) -> Result<Type, EvalError> {
-    let mut context = Context {
-        vartable: HashMap::new(),
-    };
-    return eval_(exp, &mut context);
+    let mut context = Context::new();
+    return eval_with_context(exp, &mut context);
 }
 
 // 評価時に持ち回す情報を管理する
-struct Context {
+pub struct Context {
     // TODO: vartableのvalueにType::Varが含まれることはありえないので、Type::Varを含まないようなenumを新しく定義してvalueの型としたい
     vartable: HashMap<String, Type>, // 変数テーブル
 }
 
-fn eval_(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
+impl Context {
+    fn new() -> Context {
+        return Context {
+            vartable: HashMap::new(),
+        };
+    }
+}
+
+// exp を、 context 付きで評価する
+pub fn eval_with_context(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
     match exp {
         Type::Int(_) => {
             return Ok(exp);
@@ -85,7 +92,7 @@ fn eval_(exp: Type, context: &mut Context) -> Result<Type, EvalError> {
                                 .tail()
                                 .into_iter()
                                 .try_fold(LispList::new(), |acc, e| {
-                                    let res = eval_(e.head().unwrap(), context)?;
+                                    let res = eval_with_context(e.head().unwrap(), context)?;
                                     Ok(acc.cons(&res))
                                 })?;
                         let result = f(evaluated.reverse())?;
@@ -117,13 +124,13 @@ fn wloop(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     let body = l.tail().head().unwrap();
 
     loop {
-        let evaluated_cond = eval_(cond.clone(), context)?;
+        let evaluated_cond = eval_with_context(cond.clone(), context)?;
         if let Type::Int(i) = evaluated_cond {
             if i == 0 {
                 // 便宜的にType::Int(0) を返す
                 return Ok(Type::Int(0));
             } else {
-                eval_(body.clone(), context)?;
+                eval_with_context(body.clone(), context)?;
             }
         } else {
             return Err(EvalError::TypeMismatch);
@@ -139,7 +146,7 @@ fn progn(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     }
     // 各要素を順番に評価していく
     let res = l.into_iter().try_fold(Type::Int(0) /* dummy */, |_, e| {
-        let res = eval_(e.head().unwrap(), context)?;
+        let res = eval_with_context(e.head().unwrap(), context)?;
         return Ok(res);
     })?;
     return Ok(res);
@@ -152,7 +159,7 @@ fn set(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     }
 
     let var = l.head().unwrap();
-    let val = eval_(l.tail().head().unwrap(), context)?; // valはset関数に渡されてから評価する
+    let val = eval_with_context(l.tail().head().unwrap(), context)?; // valはset関数に渡されてから評価する
 
     // valはType::Var以外である必要がある
     if let Type::Var(_) = val {
@@ -312,24 +319,14 @@ fn lt(l: LispList) -> Result<Type, EvalError> {
 
     if let Type::Int(aint) = a {
         if let Type::Int(bint) = b {
-            let res;
-            if aint < bint {
-                res = 1;
-            } else {
-                res = 0;
-            }
+            let res = if aint < bint { 1 } else { 0 };
             return Ok(Type::Int(res));
         } else {
             return Err(EvalError::TypeMismatch);
         }
     } else if let Type::Atom(aatom) = a {
         if let Type::Atom(batom) = b {
-            let res;
-            if aatom < batom {
-                res = 1;
-            } else {
-                res = 0;
-            }
+            let res = if aatom < batom { 1 } else { 0 };
             return Ok(Type::Int(res));
         } else {
             return Err(EvalError::TypeMismatch);
@@ -367,14 +364,14 @@ fn cond(l: LispList, context: &mut Context) -> Result<Type, EvalError> {
     let ok = l.tail().head().unwrap();
     let ng = l.tail().tail().head().unwrap();
 
-    let r = eval_(cond, context)?;
+    let r = eval_with_context(cond, context)?;
 
     match r {
         Type::Int(0) => {
-            return eval_(ng, context);
+            return eval_with_context(ng, context);
         }
         Type::Int(_) => {
-            return eval_(ok, context);
+            return eval_with_context(ok, context);
         }
         _ => {
             return Err(EvalError::TypeMismatch);

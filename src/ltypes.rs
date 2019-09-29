@@ -274,11 +274,14 @@ mod tests {
             Ok(Type::Var(Rc::new("*abcdefg*".to_string())))
         );
 
-        assert_eq!(Type::try_from("abc def".as_bytes()),
-                   Err(TypeConversionError::InvalidToken));
-        assert_eq!(Type::try_from("(abc def) ()".as_bytes()),
-                   Err(TypeConversionError::InvalidToken));
-
+        assert_eq!(
+            Type::try_from("abc def".as_bytes()),
+            Err(TypeConversionError::InvalidToken)
+        );
+        assert_eq!(
+            Type::try_from("(abc def) ()".as_bytes()),
+            Err(TypeConversionError::InvalidToken)
+        );
     }
 
     #[test]
