@@ -1,18 +1,17 @@
 use std::rc::Rc;
 
-
 // リスト表現
 #[derive(Debug, Clone, PartialEq)]
-pub enum CommonList<T : Clone> {
+pub enum CommonList<T: Clone> {
     Cons(T, Rc<Self>),
     Nil,
 }
 
-pub struct CommonListIterator<T : Clone> {
+pub struct CommonListIterator<T: Clone> {
     list: CommonList<T>,
 }
 
-impl<T : Clone> Iterator for CommonListIterator<T> {
+impl<T: Clone> Iterator for CommonListIterator<T> {
     type Item = CommonList<T>;
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.list.clone();
@@ -28,16 +27,16 @@ impl<T : Clone> Iterator for CommonListIterator<T> {
     }
 }
 
-impl<T : Clone> IntoIterator for CommonList<T> {
+impl<T: Clone> IntoIterator for CommonList<T> {
     type Item = CommonList<T>;
     type IntoIter = CommonListIterator<T>;
     fn into_iter(self) -> Self::IntoIter {
-        CommonListIterator::<T>{list : self.clone() }
+        CommonListIterator::<T> { list: self.clone() }
     }
 }
 
 // リスト操作を行う関数
-impl<T : Clone> CommonList<T> {
+impl<T: Clone> CommonList<T> {
     pub fn new() -> CommonList<T> {
         return CommonList::<T>::Nil;
     }

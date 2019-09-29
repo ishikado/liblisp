@@ -1,7 +1,7 @@
 // liblispで、lisp構造の表現に用いる型定義
+use crate::util::*;
 use std::convert::TryFrom;
 use std::rc::Rc;
-use crate::util::*;
 
 pub type ExpressionList = CommonList<Expression>;
 
@@ -18,7 +18,6 @@ pub enum Expression {
 pub enum ExpressionConversionError {
     InvalidToken,
 }
-
 
 impl TryFrom<&[u8]> for Expression {
     type Error = ExpressionConversionError;
@@ -146,7 +145,10 @@ mod tests {
     fn type_tests() {
         use crate::ltypes::*;
 
-        assert_eq!(Expression::try_from("12345".as_bytes()), Ok(Expression::Int(12345)));
+        assert_eq!(
+            Expression::try_from("12345".as_bytes()),
+            Ok(Expression::Int(12345))
+        );
         assert_eq!(
             Expression::try_from("atom".as_bytes()),
             Ok(Expression::Atom(Rc::new("atom".to_string())))
@@ -221,7 +223,10 @@ mod tests {
         // tail test
         assert_eq!(
             list1.tail(),
-            ExpressionList::Cons(Expression::Atom(Rc::new("a".to_string())), Rc::new(ExpressionList::Nil))
+            ExpressionList::Cons(
+                Expression::Atom(Rc::new("a".to_string())),
+                Rc::new(ExpressionList::Nil)
+            )
         );
 
         // cons test

@@ -1,9 +1,8 @@
+use crate::ltypes::*;
+use crate::util::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::rc::Rc;
-use crate::ltypes::*;
-use crate::util::*;
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
@@ -26,10 +25,9 @@ pub enum Type {
     TypeList(Rc<TypeList>),
 }
 
-
 // ExpressionList to TypeList
 impl TypeList {
-    fn try_from(l : ExpressionList, context: &mut Context) -> Result<TypeList, EvalError> {
+    fn try_from(l: ExpressionList, context: &mut Context) -> Result<TypeList, EvalError> {
         match l {
             ExpressionList::Nil => {
                 return Ok(TypeList::Nil);
@@ -42,7 +40,6 @@ impl TypeList {
         }
     }
 }
-
 
 // exp を評価する
 pub fn eval(exp: Expression) -> Result<Type, EvalError> {
@@ -532,7 +529,8 @@ mod tests {
 
         // head
         {
-            let exp = eval(Expression::try_from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
+            let exp =
+                eval(Expression::try_from("(head (list 10 (list 20) 30))".as_bytes()).unwrap());
             assert_eq!(exp, Ok(Type::Int(10)));
         }
 
@@ -571,7 +569,8 @@ mod tests {
     fn progn_tests() {
         {
             let exp =
-                Expression::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes()).unwrap();
+                Expression::try_from("(progn (set *a* 10) (add *a* (add *a* 20)))".as_bytes())
+                    .unwrap();
             match eval(exp) {
                 Ok(Type::Int(40)) => assert!(true),
                 _ => assert!(false),
