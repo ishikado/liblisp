@@ -15,120 +15,30 @@ pub enum EvalError {
     EvaluatingNonAtomHeadList,
 }
 
+pub type TypeList = CommonList<Type>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Int(i32),
     Atom(Rc<String>),
-    List(Rc<List>),
+    TypeList(Rc<TypeList>),
 }
 
 
-// リスト表現
-#[derive(Debug, Clone, PartialEq)]
-pub enum List {
-    Cons(Type, Rc<List>),
-    Nil,
-}
-
-pub struct ListIterator {
-    list: List,
-}
-
-
-impl Iterator for ListIterator {
-    type Item = List;
-    fn next(&mut self) -> Option<Self::Item> {
-        let res = self.list.clone();
-        match &self.list {
-            List::Nil => {
-                return None;
-            }
-            List::Cons(_, ref r) => {
-                self.list = (**r).clone();
-                return Some(res);
-            }
-        }
-    }
-}
-
-impl IntoIterator for List {
-    type Item = List;
-    type IntoIter = ListIterator;
-    fn into_iter(self) -> Self::IntoIter {
-        ListIterator { list: self.clone() }
-    }
-}
-
-
-impl List {
-    fn try_from(l : ExpressionList, context: &mut Context) -> Result<List, EvalError> {
+// ExpressionList to TypeList
+impl TypeList {
+    fn try_from(l : ExpressionList, context: &mut Context) -> Result<TypeList, EvalError> {
         match l {
             ExpressionList::Nil => {
-                return Ok(List::Nil);
+                return Ok(TypeList::Nil);
             }
             ExpressionList::Cons(e, left) => {
                 let r = eval_with_context(e, context)?;
                 let r2 = Self::try_from((*left).clone(), context)?;
-                return Ok(List::Cons(r, Rc::new(r2)));
+                return Ok(TypeList::Cons(r, Rc::new(r2)));
             }
         }
     }
-
-    pub fn new() -> List {
-        return List::Nil;
-    }
-
-    pub fn cons(&self, tp: &Type) -> List {
-        return List::Cons(tp.clone(), Rc::new(self.clone()));
-    }
-
-    pub fn head(&self) -> Option<Type> {
-        match self {
-            List::Nil => {
-                return None;
-            }
-            List::Cons(ref tp, _) => {
-                return Some(tp.clone());
-            }
-        }
-    }
-
-    pub fn tail(&self) -> List {
-        match self {
-            List::Nil => return self.clone(),
-            List::Cons(_, ref tail) => {
-                return (**tail).clone();
-            }
-        }
-    }
-    pub fn len(&self) -> u32 {
-        match self {
-            List::Nil => {
-                return 0;
-            }
-            List::Cons(_, ref tail) => {
-                return tail.len() + 1;
-            }
-        }
-    }
-
-    // reverse自要素をreverseしたlistを返す
-    pub fn reverse(&self) -> List {
-        return Self::reverse_(self.clone(), List::new());
-    }
-
-    fn reverse_(old: List, new: List) -> List {
-        match old.head() {
-            None => {
-                return new;
-            }
-            Some(hd) => {
-                return Self::reverse_(old.tail(), new.cons(&hd));
-            }
-        }
-    }
-
-
 }
 
 
@@ -140,7 +50,6 @@ pub fn eval(exp: Expression) -> Result<Type, EvalError> {
 
 // 評価時に持ち回す情報を管理する
 pub struct Context {
-    // TODO: vartableのvalueにType::Varが含まれることはありえないので、Type::Varを含まないようなenumを新しく定義してvalueの型としたい
     vartable: HashMap<String, Type>, // 変数テーブル
 }
 
@@ -170,7 +79,7 @@ pub fn eval_with_context(exp: Expression, context: &mut Context) -> Result<Type,
         }
         Expression::ExpressionList(clist) => {
             // 組み込み関数のテーブル
-            let mut embeded_fn_table: HashMap<&str, fn(List) -> Result<Type, EvalError>> =
+            let mut embeded_fn_table: HashMap<&str, fn(TypeList) -> Result<Type, EvalError>> =
                 HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
@@ -204,15 +113,8 @@ pub fn eval_with_context(exp: Expression, context: &mut Context) -> Result<Type,
                     // 組み込み関数の適用
                     else if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
                         // 引数をそれぞれ評価する
-                        let evaluated: List =
-                            clist
-                                .tail()
-                                .into_iter()
-                                .try_fold(List::new(), |acc, e| {
-                                    let res = eval_with_context(e.head().unwrap(), context)?;
-                                    Ok(acc.cons(&res))
-                                })?;
-                        let result = f(evaluated.reverse())?;
+                        let evaluated: TypeList = TypeList::try_from(clist.tail(), context)?;
+                        let result = f(evaluated)?;
                         return Ok(result);
                     } else {
                         // TODO: ユーザ定義関数の適用
@@ -288,17 +190,17 @@ fn set(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
 }
 
 // リストを作成する
-fn list(l: List) -> Result<Type, EvalError> {
-    return Ok(Type::List(Rc::new(l)));
+fn list(l: TypeList) -> Result<Type, EvalError> {
+    return Ok(Type::TypeList(Rc::new(l)));
 }
 
 // リストの先頭要素を取り出す
-fn head(l: List) -> Result<Type, EvalError> {
+fn head(l: TypeList) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
     let a = l.head().unwrap();
-    if let Type::List(b) = a {
+    if let Type::TypeList(b) = a {
         if let Some(c) = b.head() {
             return Ok(c);
         } else {
@@ -310,13 +212,13 @@ fn head(l: List) -> Result<Type, EvalError> {
 }
 
 // リストの先頭要素外を取り除いたものを返す
-fn tail(l: List) -> Result<Type, EvalError> {
+fn tail(l: TypeList) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
     let a = l.head().unwrap();
-    if let Type::List(b) = a {
-        return Ok(Type::List(Rc::new(b.tail())));
+    if let Type::TypeList(b) = a {
+        return Ok(Type::TypeList(Rc::new(b.tail())));
     } else {
         return Err(EvalError::TypeMismatch);
     }
@@ -330,24 +232,24 @@ enum ArithType {
 }
 
 // 加算を行う
-fn add(l: List) -> Result<Type, EvalError> {
+fn add(l: TypeList) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Add);
 }
 // 減算を行う
-fn sub(l: List) -> Result<Type, EvalError> {
+fn sub(l: TypeList) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Sub);
 }
 // 乗算を行う
-fn mul(l: List) -> Result<Type, EvalError> {
+fn mul(l: TypeList) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Mul);
 }
 // 除算を行う
-fn div(l: List) -> Result<Type, EvalError> {
+fn div(l: TypeList) -> Result<Type, EvalError> {
     return arith_op(l, ArithType::Div);
 }
 
 // 加減乗除の演算を行う
-fn arith_op(l: List, tp: ArithType) -> Result<Type, EvalError> {
+fn arith_op(l: TypeList, tp: ArithType) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -382,7 +284,7 @@ fn arith_op(l: List, tp: ArithType) -> Result<Type, EvalError> {
 // > 演算を行う
 // a > b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn gt(l: List) -> Result<Type, EvalError> {
+fn gt(l: TypeList) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -422,7 +324,7 @@ fn gt(l: List) -> Result<Type, EvalError> {
 // < 演算を行う
 // a < b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn lt(l: List) -> Result<Type, EvalError> {
+fn lt(l: TypeList) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -452,7 +354,7 @@ fn lt(l: List) -> Result<Type, EvalError> {
 // == 演算を行う
 // a == b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn eq(l: List) -> Result<Type, EvalError> {
+fn eq(l: TypeList) -> Result<Type, EvalError> {
     let res1 = gt(l.clone())?;
     let res2 = lt(l.clone())?;
 
@@ -600,11 +502,11 @@ mod tests {
             let exp = eval(Expression::try_from("(list 1 2 3)".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::List(Rc::new(List::Cons(
+                Ok(Type::TypeList(Rc::new(TypeList::Cons(
                     Type::Int(1),
-                    Rc::new(List::Cons(
+                    Rc::new(TypeList::Cons(
                         Type::Int(2),
-                        Rc::new(List::Cons(Type::Int(3), Rc::new(List::Nil)))
+                        Rc::new(TypeList::Cons(Type::Int(3), Rc::new(TypeList::Nil)))
                     ))
                 ))))
             );
@@ -613,13 +515,13 @@ mod tests {
             let exp = eval(Expression::try_from("(list a b c)".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::List(Rc::new(List::Cons(
+                Ok(Type::TypeList(Rc::new(TypeList::Cons(
                     Type::Atom(Rc::new("a".to_string())),
-                    Rc::new(List::Cons(
+                    Rc::new(TypeList::Cons(
                         Type::Atom(Rc::new("b".to_string())),
-                        Rc::new(List::Cons(
+                        Rc::new(TypeList::Cons(
                             Type::Atom(Rc::new("c".to_string())),
-                            Rc::new(List::Nil)
+                            Rc::new(TypeList::Nil)
                         ))
                     ))
                 ))))
@@ -637,9 +539,9 @@ mod tests {
             let exp = eval(Expression::try_from("(tail (list 1 2 3))".as_bytes()).unwrap());
             assert_eq!(
                 exp,
-                Ok(Type::List(Rc::new(List::Cons(
+                Ok(Type::TypeList(Rc::new(TypeList::Cons(
                     Type::Int(2),
-                    Rc::new(List::Cons(Type::Int(3), Rc::new(List::Nil)))
+                    Rc::new(TypeList::Cons(Type::Int(3), Rc::new(TypeList::Nil)))
                 ))))
             );
         }
