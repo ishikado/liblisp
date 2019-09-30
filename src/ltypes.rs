@@ -3,7 +3,7 @@ use crate::util::*;
 use std::convert::TryFrom;
 use std::rc::Rc;
 
-pub type ExpressionList = CommonList<Expression>;
+pub type ExpressionList = List<Expression>;
 
 // 許容する型一覧
 #[derive(Debug, Clone, PartialEq)]

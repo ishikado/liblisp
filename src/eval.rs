@@ -16,7 +16,7 @@ pub enum EvalError {
     EvaluatingNonAtomHeadList,
 }
 
-pub type TypeList = CommonList<Type>;
+pub type TypeList = List<Type>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
