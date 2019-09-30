@@ -1,4 +1,7 @@
-/// liblispで、lisp構造の表現に用いる型定義
+//!
+//! lisp構造の表現型、及び文字列からの変換関数を定義
+//!
+
 use crate::util::*;
 use std::convert::TryFrom;
 use std::rc::Rc;

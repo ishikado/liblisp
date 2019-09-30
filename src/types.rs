@@ -1,6 +1,9 @@
+//!
+//! Lisp の型に関する定義
+//!
+
 use crate::util::*;
 use std::rc::Rc;
-
 
 pub type TypeList = List<Type>;
 

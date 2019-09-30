@@ -1,3 +1,7 @@
+//!
+//! Expression を Type に変換する処理を定義
+//!
+
 use crate::expression::*;
 use crate::types::*;
 use std::collections::HashMap;
@@ -17,7 +21,6 @@ pub enum EvalError {
     EvaluatingNonAtomHeadList,
 }
 
-
 /// `ExpressionList` to `TypeList`
 impl TypeList {
     fn try_from(l: &ExpressionList, context: &mut Context) -> Result<TypeList, EvalError> {
@@ -33,7 +36,6 @@ impl TypeList {
         }
     }
 }
-
 
 /// `Expression` を `Type` に変換する
 pub fn eval(exp: &Expression) -> Result<Type, EvalError> {
