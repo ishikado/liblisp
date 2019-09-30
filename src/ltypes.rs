@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 pub type ExpressionList = List<Expression>;
 
-// 許容する型一覧
+// 許容する式一覧
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Int(i32),

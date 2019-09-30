@@ -18,6 +18,8 @@ pub enum EvalError {
 
 pub type TypeList = List<Type>;
 
+// 許容する型一覧
+// NOTE : void型があってもいいかもしれない
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Int(i32),
