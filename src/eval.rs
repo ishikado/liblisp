@@ -19,12 +19,12 @@ pub enum EvalError {
 pub type TypeList = List<Type>;
 
 // 許容する型一覧
-// NOTE : void型があってもいいかもしれない
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Int(i32),
     Atom(Rc<String>),
     TypeList(Rc<TypeList>),
+    Void
 }
 
 // ExpressionList to TypeList
@@ -147,8 +147,7 @@ fn wloop(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
         let evaluated_cond = eval_with_context(cond.clone(), context)?;
         if let Type::Int(i) = evaluated_cond {
             if i == 0 {
-                // 便宜的にType::Int(0) を返す
-                return Ok(Type::Int(0));
+                return Ok(Type::Void);
             } else {
                 eval_with_context(body.clone(), context)?;
             }
@@ -165,7 +164,7 @@ fn progn(l: ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
         return Err(EvalError::BadArrity);
     }
     // 各要素を順番に評価していく
-    let res = l.into_iter().try_fold(Type::Int(0) /* dummy */, |_, e| {
+    let res = l.into_iter().try_fold(Type::Void, |_, e| {
         let res = eval_with_context(e.head().unwrap(), context)?;
         return Ok(res);
     })?;
@@ -589,6 +588,25 @@ mod tests {
                 _ => assert!(false),
             }
         }
+        // whileは Void を返す
+        {
+            let exp = Expression::try_from("(progn (set *i* 0) (set *a* 0) (while (lt *i* 10) (progn (set *a* (add *i* *a*)) (set *i* (add *i* 1)))))".as_bytes()).unwrap();
+            match eval(exp) {
+                Ok(Type::Void) => assert!(true),
+                _ => assert!(false),
+            }
+        }
+
     }
+
+    #[test]
+    fn set_tests(){
+        let exp = Expression::try_from("(set *i* 1)".as_bytes()).unwrap();
+        match eval(exp) {
+            Ok(Type::Int(1)) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
 
 }
