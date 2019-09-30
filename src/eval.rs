@@ -24,7 +24,7 @@ pub enum Type {
     Int(i32),
     Atom(Rc<String>),
     TypeList(Rc<TypeList>),
-    Void
+    Void,
 }
 
 // ExpressionList to TypeList
@@ -281,10 +281,13 @@ fn arith_op(l: TypeList, tp: ArithType) -> Result<Type, EvalError> {
     return Ok(Type::Int(calc_result));
 }
 
-// > 演算を行う
-// a > b なら 1 、そうでないなら 0 を返す
-// Atom同士、Int同士の場合のみ演算を許容する
-fn gt(l: TypeList) -> Result<Type, EvalError> {
+enum CompareType {
+    Gt,
+    Lt,
+    Eq,
+}
+
+fn compare(l: TypeList, ctype: CompareType) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -295,10 +298,16 @@ fn gt(l: TypeList) -> Result<Type, EvalError> {
     if let Type::Int(aint) = a {
         if let Type::Int(bint) = b {
             let res;
-            if aint > bint {
-                res = 1;
-            } else {
-                res = 0;
+            match ctype {
+                CompareType::Gt => {
+                    res = if aint > bint { 1 } else { 0 };
+                }
+                CompareType::Lt => {
+                    res = if aint < bint { 1 } else { 0 };
+                }
+                CompareType::Eq => {
+                    res = if aint == bint { 1 } else { 0 };
+                }
             }
             return Ok(Type::Int(res));
         } else {
@@ -307,10 +316,16 @@ fn gt(l: TypeList) -> Result<Type, EvalError> {
     } else if let Type::Atom(aatom) = a {
         if let Type::Atom(batom) = b {
             let res;
-            if aatom > batom {
-                res = 1;
-            } else {
-                res = 0;
+            match ctype {
+                CompareType::Gt => {
+                    res = if aatom > batom { 1 } else { 0 };
+                }
+                CompareType::Lt => {
+                    res = if aatom < batom { 1 } else { 0 };
+                }
+                CompareType::Eq => {
+                    res = if aatom == batom { 1 } else { 0 };
+                }
             }
             return Ok(Type::Int(res));
         } else {
@@ -319,49 +334,27 @@ fn gt(l: TypeList) -> Result<Type, EvalError> {
     } else {
         return Err(EvalError::TypeMismatch);
     }
+}
+
+// > 演算を行う
+// a > b なら 1 、そうでないなら 0 を返す
+// Atom同士、Int同士の場合のみ演算を許容する
+fn gt(l: TypeList) -> Result<Type, EvalError> {
+    return compare(l, CompareType::Gt);
 }
 
 // < 演算を行う
 // a < b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
 fn lt(l: TypeList) -> Result<Type, EvalError> {
-    if l.len() != 2 {
-        return Err(EvalError::BadArrity);
-    }
-
-    let a = l.head().unwrap();
-    let b = l.tail().head().unwrap();
-
-    if let Type::Int(aint) = a {
-        if let Type::Int(bint) = b {
-            let res = if aint < bint { 1 } else { 0 };
-            return Ok(Type::Int(res));
-        } else {
-            return Err(EvalError::TypeMismatch);
-        }
-    } else if let Type::Atom(aatom) = a {
-        if let Type::Atom(batom) = b {
-            let res = if aatom < batom { 1 } else { 0 };
-            return Ok(Type::Int(res));
-        } else {
-            return Err(EvalError::TypeMismatch);
-        }
-    } else {
-        return Err(EvalError::TypeMismatch);
-    }
+    return compare(l, CompareType::Lt);
 }
 
 // == 演算を行う
 // a == b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
 fn eq(l: TypeList) -> Result<Type, EvalError> {
-    let res1 = gt(l.clone())?;
-    let res2 = lt(l.clone())?;
-
-    if res1 == Type::Int(0) && res2 == Type::Int(0) {
-        return Ok(Type::Int(1));
-    }
-    return Ok(Type::Int(0));
+    return compare(l, CompareType::Eq);
 }
 
 // (条件 成立 不成立) という３つ組のリストを受け取り、
@@ -596,17 +589,15 @@ mod tests {
                 _ => assert!(false),
             }
         }
-
     }
 
     #[test]
-    fn set_tests(){
+    fn set_tests() {
         let exp = Expression::try_from("(set *i* 1)".as_bytes()).unwrap();
         match eval(exp) {
             Ok(Type::Int(1)) => assert!(true),
             _ => assert!(false),
         }
     }
-
 
 }
