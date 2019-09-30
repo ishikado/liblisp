@@ -31,7 +31,7 @@ impl<T: Clone> IntoIterator for List<T> {
     type Item = List<T>;
     type IntoIter = ListIterator<T>;
     fn into_iter(self) -> Self::IntoIter {
-        ListIterator::<T> { list: self.clone() }
+        ListIterator::<T> { list: self }
     }
 }
 
@@ -45,22 +45,22 @@ impl<T: Clone> List<T> {
         return List::<T>::Cons(tp.clone(), Rc::new(self.clone()));
     }
 
-    pub fn head(&self) -> Option<T> {
+    pub fn head(&self) -> Option<&T> {
         match self {
             List::<T>::Nil => {
                 return None;
             }
             List::<T>::Cons(ref tp, _) => {
-                return Some(tp.clone());
+                return Some(tp);
             }
         }
     }
 
-    pub fn tail(&self) -> List<T> {
+    pub fn tail(&self) -> &List<T> {
         match self {
-            List::<T>::Nil => return self.clone(),
+            List::<T>::Nil => return self,
             List::<T>::Cons(_, ref tail) => {
-                return (**tail).clone();
+                return &(**tail);
             }
         }
     }
@@ -77,10 +77,10 @@ impl<T: Clone> List<T> {
 
     // 自要素をreverseしたlistを返す
     pub fn reverse(&self) -> List<T> {
-        return Self::reverse_(self.clone(), List::<T>::new());
+        return Self::reverse_(self, List::<T>::new());
     }
 
-    fn reverse_(old: List<T>, new: List<T>) -> List<T> {
+    fn reverse_(old: &List<T>, new: List<T>) -> List<T> {
         match old.head() {
             None => {
                 return new;

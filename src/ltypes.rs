@@ -218,12 +218,12 @@ mod tests {
         assert_eq!(list2.len(), 1);
 
         // head test
-        assert_eq!(list1.head(), Some(Expression::Int(32)));
+        assert_eq!(list1.head(), Some(&Expression::Int(32)));
 
         // tail test
         assert_eq!(
             list1.tail(),
-            ExpressionList::Cons(
+            &ExpressionList::Cons(
                 Expression::Atom(Rc::new("a".to_string())),
                 Rc::new(ExpressionList::Nil)
             )
