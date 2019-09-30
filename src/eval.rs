@@ -1,9 +1,10 @@
-use crate::ltypes::*;
-use crate::util::*;
+use crate::expression::*;
+use crate::types::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::rc::Rc;
 
+/// `eval` 及び `eval_with_context` 呼び出し時のエラー
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
     Unexpected,
@@ -16,18 +17,8 @@ pub enum EvalError {
     EvaluatingNonAtomHeadList,
 }
 
-pub type TypeList = List<Type>;
 
-// 許容する型一覧
-#[derive(Debug, Clone, PartialEq)]
-pub enum Type {
-    Int(i32),
-    Atom(Rc<String>),
-    TypeList(Rc<TypeList>),
-    Void,
-}
-
-// ExpressionList to TypeList
+/// `ExpressionList` to `TypeList`
 impl TypeList {
     fn try_from(l: &ExpressionList, context: &mut Context) -> Result<TypeList, EvalError> {
         match l {
@@ -43,18 +34,20 @@ impl TypeList {
     }
 }
 
-// exp を評価する
+
+/// `Expression` を `Type` に変換する
 pub fn eval(exp: &Expression) -> Result<Type, EvalError> {
     let mut context = Context::new();
     return eval_with_context(exp, &mut context);
 }
 
-// 評価時に持ち回す情報を管理する
+/// `eval` 及び `eval_with_context` 実行時に、持ち回す情報を管理する
 pub struct Context {
     vartable: HashMap<String, Type>, // 変数テーブル
 }
 
 impl Context {
+    /// `Context` を新規作成
     fn new() -> Context {
         return Context {
             vartable: HashMap::new(),
@@ -62,7 +55,9 @@ impl Context {
     }
 }
 
-// exp を、 context 付きで評価する
+/// `Expression` を `Type` に変換する。
+/// このとき、`Context` の情報を参照し、必要があれば `Context` に情報を追加する。
+/// `Expression` で、変数のセットを行い、その値を、次の `eval_with_context` 呼び出しに使いたい場合、この関数を使うと良い。
 pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type, EvalError> {
     match exp {
         Expression::Int(i) => {
@@ -133,8 +128,8 @@ pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type
     }
 }
 
-// (wloop cond body) という形式の while loop
-// cond が 1 である限りループを続ける
+// (wloop cond body) という形式の while loop。
+// cond が 1 である限りループを続ける。
 fn wloop(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
@@ -157,8 +152,8 @@ fn wloop(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     }
 }
 
-// リストの要素を順番に評価する
-// 最後に評価した値を戻り値とする
+// リストの要素を順番に評価する。
+// 最後に評価した値を戻り値とする。
 fn progn(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
     if l.len() == 0 {
         return Err(EvalError::BadArrity);
@@ -211,7 +206,7 @@ fn head(l: &TypeList) -> Result<Type, EvalError> {
     }
 }
 
-// リストの先頭要素外を取り除いたものを返す
+/// リストの先頭要素外を取り除いたものを返す
 fn tail(l: &TypeList) -> Result<Type, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);

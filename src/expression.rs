@@ -1,11 +1,11 @@
-// liblispで、lisp構造の表現に用いる型定義
+/// liblispで、lisp構造の表現に用いる型定義
 use crate::util::*;
 use std::convert::TryFrom;
 use std::rc::Rc;
 
 pub type ExpressionList = List<Expression>;
 
-// 許容する式一覧
+/// Lispの式定義
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Int(i32),
@@ -14,6 +14,7 @@ pub enum Expression {
     ExpressionList(Rc<ExpressionList>),
 }
 
+/// byte列を Expression に変換したときに発生したエラー
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionConversionError {
     InvalidToken,
@@ -143,7 +144,7 @@ impl Expression {
 mod tests {
     #[test]
     fn type_tests() {
-        use crate::ltypes::*;
+        use crate::expression::*;
 
         assert_eq!(
             Expression::try_from("12345".as_bytes()),
@@ -199,7 +200,7 @@ mod tests {
 
     #[test]
     fn lisplist_tests() {
-        use crate::ltypes::*;
+        use crate::expression::*;
 
         let list1 = ExpressionList::Cons(
             Expression::Int(32),

@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
-// リスト表現
+/// 連結リスト
 #[derive(Debug, Clone, PartialEq)]
 pub enum List<T: Clone> {
     Cons(T, Rc<Self>),
     Nil,
 }
 
+/// `List<T>` のイテレータ
 pub struct ListIterator<T: Clone> {
     list: List<T>,
 }
@@ -35,16 +36,19 @@ impl<T: Clone> IntoIterator for List<T> {
     }
 }
 
-// リスト操作を行う関数
 impl<T: Clone> List<T> {
+    /// `List<T>` を新規作成。
     pub fn new() -> List<T> {
         return List::<T>::Nil;
     }
 
+    /// `List<T>` の先頭に、`T` を追加する。
     pub fn cons(&self, tp: &T) -> List<T> {
         return List::<T>::Cons(tp.clone(), Rc::new(self.clone()));
     }
 
+    /// `List<T>` の先頭要素を取り出す。
+    /// もしリストが `List::<T>::Nil` の場合、`None` になる。
     pub fn head(&self) -> Option<&T> {
         match self {
             List::<T>::Nil => {
@@ -56,6 +60,7 @@ impl<T: Clone> List<T> {
         }
     }
 
+    /// `List<T>` の先頭を取り除いた、残りの要素の `&List<T>` を返す。
     pub fn tail(&self) -> &List<T> {
         match self {
             List::<T>::Nil => return self,
@@ -64,6 +69,8 @@ impl<T: Clone> List<T> {
             }
         }
     }
+
+    /// `List<T>` の長さ。
     pub fn len(&self) -> u32 {
         match self {
             List::<T>::Nil => {
@@ -75,7 +82,7 @@ impl<T: Clone> List<T> {
         }
     }
 
-    // 自要素をreverseしたlistを返す
+    /// `List<T>` を反転したのを返す。
     pub fn reverse(&self) -> List<T> {
         return Self::reverse_(self, List::<T>::new());
     }
