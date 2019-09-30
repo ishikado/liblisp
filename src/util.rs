@@ -75,7 +75,7 @@ impl<T: Clone> List<T> {
         }
     }
 
-    // reverse自要素をreverseしたlistを返す
+    // 自要素をreverseしたlistを返す
     pub fn reverse(&self) -> List<T> {
         return Self::reverse_(self.clone(), List::<T>::new());
     }
