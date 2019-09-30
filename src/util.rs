@@ -50,7 +50,7 @@ impl<T: Clone> List<T> {
             List::<T>::Nil => {
                 return None;
             }
-            List::<T>::Cons(ref tp, _) => {
+            List::<T>::Cons(tp, _) => {
                 return Some(tp);
             }
         }
@@ -59,7 +59,7 @@ impl<T: Clone> List<T> {
     pub fn tail(&self) -> &List<T> {
         match self {
             List::<T>::Nil => return self,
-            List::<T>::Cons(_, ref tail) => {
+            List::<T>::Cons(_, tail) => {
                 return &(**tail);
             }
         }
@@ -69,7 +69,7 @@ impl<T: Clone> List<T> {
             List::<T>::Nil => {
                 return 0;
             }
-            List::<T>::Cons(_, ref tail) => {
+            List::<T>::Cons(_, tail) => {
                 return tail.len() + 1;
             }
         }

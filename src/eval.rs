@@ -34,7 +34,7 @@ impl TypeList {
             ExpressionList::Nil => {
                 return Ok(TypeList::Nil);
             }
-            ExpressionList::Cons(ref e, ref left) => {
+            ExpressionList::Cons(e, left) => {
                 let r = eval_with_context(e, context)?;
                 let r2 = Self::try_from(&**left, context)?;
                 return Ok(TypeList::Cons(r, Rc::new(r2)));
