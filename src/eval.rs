@@ -63,7 +63,7 @@ pub fn eval<'a>(exp: &Expression<'a>) -> Result<Type<'a>, EvalError> {
 
 /// `eval` 及び `eval_with_context` 実行時に、持ち回す情報を管理する
 pub struct Context<'a> {
-    vartable: HashMap<String, Type<'a>>, // 変数テーブル
+    vartable: HashMap<&'a str, Type<'a>>, // 変数テーブル
 }
 
 impl<'a> Context<'a> {
@@ -90,7 +90,7 @@ pub fn eval_with_context<'a>(
             return Ok(Type::Atom(*a));
         }
         Expression::Var(var) => {
-            if let Some(val) = context.vartable.get(&**var) {
+            if let Some(val) = context.vartable.get(*var) {
                 return Ok(val.clone());
             } else {
                 return Err(EvalError::UndefinedVariableReference);
@@ -202,7 +202,7 @@ fn set<'a>(l: &ExpressionList<'a>, context: &mut Context<'a>) -> Result<Type<'a>
 
     // varは Var である必要がある
     if let Expression::Var(varstr) = var {
-        context.vartable.insert((**varstr).clone(), val.clone());
+        context.vartable.insert(varstr, val.clone());
         return Ok(val);
     } else {
         return Err(EvalError::TypeMismatch);

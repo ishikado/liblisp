@@ -13,7 +13,7 @@ pub type ExpressionList<'a> = List<Expression<'a>>;
 pub enum Expression<'a> {
     Int(i32),
     Atom(&'a str), // Expressionをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
-    Var(Rc<String>),
+    Var(&'a str),
     ExpressionList(Rc<ExpressionList<'a>>),
 }
 
@@ -21,6 +21,7 @@ pub enum Expression<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionConversionError {
     InvalidToken,
+    Unexpected(String),
 }
 
 impl<'a> TryFrom<&'a [u8]> for Expression<'a> {
@@ -90,12 +91,10 @@ impl<'a> Expression<'a> {
         // atom
         // atomは 簡単のために、alphabetから始まり、alphabetと数字のみ含むものとする
         else if head_ch.is_alphabetic() {
-            let mut atom = "".to_string();
             let start = *index;
             while *index < bytes.len() {
                 let c = char::from(bytes[*index]);
                 if c.is_ascii_digit() || c.is_alphabetic() {
-                    atom.push(c);
                 } else {
                     // 括弧 or space or 改行 以外の文字が続いていたら異常
                     if !(c == ')' || c == ' ' || c == '\n') {
@@ -106,22 +105,28 @@ impl<'a> Expression<'a> {
                 *index += 1;
             }
             let end = *index;
-            return Ok(Expression::Atom(
-                std::str::from_utf8(&bytes[start..end]).unwrap(),
-            ));
+
+            match std::str::from_utf8(&bytes[start..end]) {
+                Ok(res) => {
+                    return Ok(Expression::Atom(res));
+                }
+                Err(e) => {
+                    // 失敗することは想定していない
+                    return Err(ExpressionConversionError::Unexpected(e.to_string()));
+                }
+            }
         }
         // var
         // *と*で囲まれた形式を想定
         else if head_ch == '*' {
-            let mut var = "*".to_string();
             let mut asta_count = 1;
+            let start = *index;
             *index += 1;
             let second_ch = char::from(bytes[*index]);
             if second_ch.is_alphabetic() {
                 while *index < bytes.len() {
                     let c = char::from(bytes[*index]);
                     if c.is_ascii_digit() || c.is_alphabetic() || c == '*' {
-                        var.push(c);
                         if c == '*' {
                             asta_count += 1;
                         }
@@ -134,11 +139,19 @@ impl<'a> Expression<'a> {
                     }
                     *index += 1;
                 }
-                // varの先頭と末尾のみ * が存在
+                let end = *index;
+                // bytes[start..end] の先頭と末尾のみ * が存在
                 // 先頭が * になっているのは、ここ以前の条件分岐から明らかなので、末尾だけ調べる
-                let var_len = var.as_bytes().len();
-                if asta_count == 2 && char::from(var.as_bytes()[var_len - 1]) == '*' {
-                    return Ok(Expression::Var(Rc::new(var)));
+                if asta_count == 2 && bytes[end - 1] == '*' as u8 {
+                    match std::str::from_utf8(&bytes[start..end]) {
+                        Ok(res) => {
+                            return Ok(Expression::Var(res));
+                        }
+                        Err(e) => {
+                            // 失敗することは想定していない
+                            return Err(ExpressionConversionError::Unexpected(e.to_string()));
+                        }
+                    }
                 } else {
                     return Err(ExpressionConversionError::InvalidToken);
                 }
@@ -195,7 +208,7 @@ mod tests {
         );
         assert_eq!(
             Expression::try_from("*abcdefg*".as_bytes()),
-            Ok(Expression::Var(Rc::new("*abcdefg*".to_string())))
+            Ok(Expression::Var("*abcdefg*"))
         );
 
         assert_eq!(
