@@ -1,6 +1,5 @@
 extern crate liblisp;
 
-
 #[test]
 fn integration_test() {
     // TODO: 実装する

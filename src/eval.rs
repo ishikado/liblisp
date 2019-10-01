@@ -22,8 +22,11 @@ pub enum EvalError {
 }
 
 /// `ExpressionList` to `TypeList`
-impl TypeList {
-    fn try_from(l: &ExpressionList, context: &mut Context) -> Result<TypeList, EvalError> {
+impl<'a> TypeList<'a> {
+    fn try_from(
+        l: &ExpressionList<'a>,
+        context: &mut Context<'a>,
+    ) -> Result<TypeList<'a>, EvalError> {
         match l {
             ExpressionList::Nil => {
                 return Ok(TypeList::Nil);
@@ -53,19 +56,19 @@ impl TypeList {
 /// }
 /// ```
 ///
-pub fn eval(exp: &Expression) -> Result<Type, EvalError> {
+pub fn eval<'a>(exp: &Expression<'a>) -> Result<Type<'a>, EvalError> {
     let mut context = Context::new();
     return eval_with_context(exp, &mut context);
 }
 
 /// `eval` 及び `eval_with_context` 実行時に、持ち回す情報を管理する
-pub struct Context {
-    vartable: HashMap<String, Type>, // 変数テーブル
+pub struct Context<'a> {
+    vartable: HashMap<String, Type<'a>>, // 変数テーブル
 }
 
-impl Context {
+impl<'a> Context<'a> {
     /// `Context` を新規作成
-    fn new() -> Context {
+    fn new() -> Context<'a> {
         return Context {
             vartable: HashMap::new(),
         };
@@ -75,13 +78,16 @@ impl Context {
 /// `Expression` を `Type` に変換する。
 /// このとき、`Context` の情報を参照し、必要があれば `Context` に情報を追加する。
 /// `Expression` で、変数のセットを行い、その値を、次の `eval_with_context` 呼び出しに使いたい場合、この関数を使うと良い。
-pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type, EvalError> {
+pub fn eval_with_context<'a>(
+    exp: &Expression<'a>,
+    context: &mut Context<'a>,
+) -> Result<Type<'a>, EvalError> {
     match exp {
         Expression::Int(i) => {
             return Ok(Type::Int(*i));
         }
         Expression::Atom(a) => {
-            return Ok(Type::Atom(a.clone()));
+            return Ok(Type::Atom(*a));
         }
         Expression::Var(var) => {
             if let Some(val) = context.vartable.get(&**var) {
@@ -92,8 +98,10 @@ pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type
         }
         Expression::ExpressionList(clist) => {
             // 組み込み関数のテーブル
-            let mut embeded_fn_table: HashMap<&str, fn(&TypeList) -> Result<Type, EvalError>> =
-                HashMap::new();
+            let mut embeded_fn_table: HashMap<
+                &'a str,
+                fn(&TypeList<'a>) -> Result<Type<'a>, EvalError>,
+            > = HashMap::new();
             embeded_fn_table.insert("add", add);
             embeded_fn_table.insert("sub", sub);
             embeded_fn_table.insert("mul", mul);
@@ -108,7 +116,7 @@ pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type
             // 引数を関数内部で評価する組み込み関数のテーブル
             let mut embeded_fn_table2: HashMap<
                 &str,
-                fn(&ExpressionList, &mut Context) -> Result<Type, EvalError>,
+                fn(&ExpressionList<'a>, &mut Context<'a>) -> Result<Type<'a>, EvalError>,
             > = HashMap::new();
             embeded_fn_table2.insert("cond", cond);
             embeded_fn_table2.insert("set", set);
@@ -119,12 +127,12 @@ pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type
             if let Some(head) = clist.head() {
                 if let Expression::Atom(fun_name) = head {
                     // 引数を関数内部で評価する組み込み関数の適用
-                    if let Some(f) = embeded_fn_table2.get(fun_name.as_str()) {
+                    if let Some(f) = embeded_fn_table2.get(*fun_name) {
                         let r = f(clist.tail(), context)?;
                         return Ok(r);
                     }
                     // 組み込み関数の適用
-                    else if let Some(f) = embeded_fn_table.get(fun_name.as_str()) {
+                    else if let Some(f) = embeded_fn_table.get(*fun_name) {
                         // 引数をそれぞれ評価する
                         let evaluated: TypeList = TypeList::try_from(clist.tail(), context)?;
                         let result = f(&evaluated)?;
@@ -147,7 +155,7 @@ pub fn eval_with_context(exp: &Expression, context: &mut Context) -> Result<Type
 
 // (wloop cond body) という形式の while loop。
 // cond が 1 である限りループを続ける。
-fn wloop(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
+fn wloop<'a>(l: &ExpressionList<'a>, context: &mut Context<'a>) -> Result<Type<'a>, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -171,7 +179,7 @@ fn wloop(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
 
 // リストの要素を順番に評価する。
 // 最後に評価した値を戻り値とする。
-fn progn(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
+fn progn<'a>(l: &ExpressionList<'a>, context: &mut Context<'a>) -> Result<Type<'a>, EvalError> {
     if l.len() == 0 {
         return Err(EvalError::BadArrity);
     }
@@ -184,7 +192,7 @@ fn progn(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
 }
 
 // 変数に指定された値をセットする
-fn set(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
+fn set<'a>(l: &ExpressionList<'a>, context: &mut Context<'a>) -> Result<Type<'a>, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -202,12 +210,12 @@ fn set(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
 }
 
 // リストを作成する
-fn list(l: &TypeList) -> Result<Type, EvalError> {
+fn list<'a>(l: &TypeList<'a>) -> Result<Type<'a>, EvalError> {
     return Ok(Type::TypeList(Rc::new(l.clone())));
 }
 
 // リストの先頭要素を取り出す
-fn head(l: &TypeList) -> Result<Type, EvalError> {
+fn head<'a>(l: &TypeList<'a>) -> Result<Type<'a>, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
@@ -224,7 +232,7 @@ fn head(l: &TypeList) -> Result<Type, EvalError> {
 }
 
 /// リストの先頭要素外を取り除いたものを返す
-fn tail(l: &TypeList) -> Result<Type, EvalError> {
+fn tail<'a>(l: &TypeList<'a>) -> Result<Type<'a>, EvalError> {
     if l.len() != 1 {
         return Err(EvalError::BadArrity);
     }
@@ -244,24 +252,24 @@ enum ArithType {
 }
 
 // 加算を行う
-fn add(l: &TypeList) -> Result<Type, EvalError> {
+fn add<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return arith_op(l, ArithType::Add);
 }
 // 減算を行う
-fn sub(l: &TypeList) -> Result<Type, EvalError> {
+fn sub<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return arith_op(l, ArithType::Sub);
 }
 // 乗算を行う
-fn mul(l: &TypeList) -> Result<Type, EvalError> {
+fn mul<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return arith_op(l, ArithType::Mul);
 }
 // 除算を行う
-fn div(l: &TypeList) -> Result<Type, EvalError> {
+fn div<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return arith_op(l, ArithType::Div);
 }
 
 // 加減乗除の演算を行う
-fn arith_op(l: &TypeList, tp: ArithType) -> Result<Type, EvalError> {
+fn arith_op<'a>(l: &TypeList, tp: ArithType) -> Result<Type<'a>, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -299,7 +307,7 @@ enum CompareType {
     Eq,
 }
 
-fn compare(l: &TypeList, ctype: CompareType) -> Result<Type, EvalError> {
+fn compare<'a>(l: &TypeList, ctype: CompareType) -> Result<Type<'a>, EvalError> {
     if l.len() != 2 {
         return Err(EvalError::BadArrity);
     }
@@ -351,21 +359,21 @@ fn compare(l: &TypeList, ctype: CompareType) -> Result<Type, EvalError> {
 // > 演算を行う
 // a > b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn gt(l: &TypeList) -> Result<Type, EvalError> {
+fn gt<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return compare(l, CompareType::Gt);
 }
 
 // < 演算を行う
 // a < b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn lt(l: &TypeList) -> Result<Type, EvalError> {
+fn lt<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return compare(l, CompareType::Lt);
 }
 
 // == 演算を行う
 // a == b なら 1 、そうでないなら 0 を返す
 // Atom同士、Int同士の場合のみ演算を許容する
-fn eq(l: &TypeList) -> Result<Type, EvalError> {
+fn eq<'a>(l: &TypeList) -> Result<Type<'a>, EvalError> {
     return compare(l, CompareType::Eq);
 }
 
@@ -375,7 +383,7 @@ fn eq(l: &TypeList) -> Result<Type, EvalError> {
 // なお、この3つの値は、cond に渡す前に評価しないこと
 // 成立か不成立どちらを実行するか、判明してから評価したいのが理由
 //（条件に関しては評価しても問題ないが、一貫性のため、評価しないこととする）
-fn cond(l: &ExpressionList, context: &mut Context) -> Result<Type, EvalError> {
+fn cond<'a>(l: &ExpressionList<'a>, context: &mut Context<'a>) -> Result<Type<'a>, EvalError> {
     if l.len() != 3 {
         return Err(EvalError::BadArrity);
     }
@@ -521,13 +529,10 @@ mod tests {
             assert_eq!(
                 exp,
                 Ok(Type::TypeList(Rc::new(TypeList::Cons(
-                    Type::Atom(Rc::new("a".to_string())),
+                    Type::Atom("a"),
                     Rc::new(TypeList::Cons(
-                        Type::Atom(Rc::new("b".to_string())),
-                        Rc::new(TypeList::Cons(
-                            Type::Atom(Rc::new("c".to_string())),
-                            Rc::new(TypeList::Nil)
-                        ))
+                        Type::Atom("b"),
+                        Rc::new(TypeList::Cons(Type::Atom("c"), Rc::new(TypeList::Nil)))
                     ))
                 ))))
             );

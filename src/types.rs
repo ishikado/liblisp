@@ -5,13 +5,13 @@
 use crate::util::*;
 use std::rc::Rc;
 
-pub type TypeList = List<Type>;
+pub type TypeList<'a> = List<Type<'a>>;
 
 /// Lispの型一覧
 #[derive(Debug, Clone, PartialEq)]
-pub enum Type {
+pub enum Type<'a> {
     Int(i32),
-    Atom(Rc<String>),
-    TypeList(Rc<TypeList>),
+    Atom(&'a str),
+    TypeList(Rc<TypeList<'a>>),
     Void,
 }

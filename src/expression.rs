@@ -6,15 +6,15 @@ use crate::util::*;
 use std::convert::TryFrom;
 use std::rc::Rc;
 
-pub type ExpressionList = List<Expression>;
+pub type ExpressionList<'a> = List<Expression<'a>>;
 
 /// Lispの式定義
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expression {
+pub enum Expression<'a> {
     Int(i32),
-    Atom(Rc<String>), // Expressionをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
+    Atom(&'a str), // Expressionをcloneしたとき、Stringがcloneされるとコピーコストが大きくなる恐れがある（未検証）ので、Rcingする
     Var(Rc<String>),
-    ExpressionList(Rc<ExpressionList>),
+    ExpressionList(Rc<ExpressionList<'a>>),
 }
 
 /// byte列を Expression に変換したときに発生したエラー
@@ -23,9 +23,9 @@ pub enum ExpressionConversionError {
     InvalidToken,
 }
 
-impl TryFrom<&[u8]> for Expression {
+impl<'a> TryFrom<&'a [u8]> for Expression<'a> {
     type Error = ExpressionConversionError;
-    fn try_from(bytes: &[u8]) -> Result<Expression, Self::Error> {
+    fn try_from(bytes: &'a [u8]) -> Result<Expression<'a>, Self::Error> {
         let mut index = 0;
         let res = Self::try_from_(&mut index, bytes);
         if index != bytes.len() {
@@ -35,8 +35,11 @@ impl TryFrom<&[u8]> for Expression {
     }
 }
 
-impl Expression {
-    fn try_from_(index: &mut usize, bytes: &[u8]) -> Result<Expression, ExpressionConversionError> {
+impl<'a> Expression<'a> {
+    fn try_from_(
+        index: &mut usize,
+        bytes: &'a [u8],
+    ) -> Result<Expression<'a>, ExpressionConversionError> {
         let head_ch = char::from(bytes[*index]);
         let mut list = ExpressionList::new();
         // list
@@ -88,6 +91,7 @@ impl Expression {
         // atomは 簡単のために、alphabetから始まり、alphabetと数字のみ含むものとする
         else if head_ch.is_alphabetic() {
             let mut atom = "".to_string();
+            let start = *index;
             while *index < bytes.len() {
                 let c = char::from(bytes[*index]);
                 if c.is_ascii_digit() || c.is_alphabetic() {
@@ -101,7 +105,10 @@ impl Expression {
                 }
                 *index += 1;
             }
-            return Ok(Expression::Atom(Rc::new(atom)));
+            let end = *index;
+            return Ok(Expression::Atom(
+                std::str::from_utf8(&bytes[start..end]).unwrap(),
+            ));
         }
         // var
         // *と*で囲まれた形式を想定
@@ -155,11 +162,11 @@ mod tests {
         );
         assert_eq!(
             Expression::try_from("atom".as_bytes()),
-            Ok(Expression::Atom(Rc::new("atom".to_string())))
+            Ok(Expression::Atom("atom"))
         );
         assert_eq!(
             Expression::try_from("atom123".as_bytes()),
-            Ok(Expression::Atom(Rc::new("atom123".to_string())))
+            Ok(Expression::Atom("atom123"))
         );
         assert_eq!(
             Expression::try_from("123atom".as_bytes()),
@@ -179,7 +186,7 @@ mod tests {
         assert_eq!(
             Expression::try_from("(atom ( ) )".as_bytes()),
             Ok(Expression::ExpressionList(Rc::new(ExpressionList::Cons(
-                Expression::Atom(Rc::new("atom".to_string())),
+                Expression::Atom("atom"),
                 Rc::new(ExpressionList::Cons(
                     Expression::ExpressionList(Rc::new(ExpressionList::Nil)),
                     Rc::new(ExpressionList::Nil)
@@ -208,7 +215,7 @@ mod tests {
         let list1 = ExpressionList::Cons(
             Expression::Int(32),
             Rc::new(ExpressionList::Cons(
-                Expression::Atom(Rc::new("a".to_string())),
+                Expression::Atom("a"),
                 Rc::new(ExpressionList::Nil),
             )),
         );
@@ -227,10 +234,7 @@ mod tests {
         // tail test
         assert_eq!(
             list1.tail(),
-            &ExpressionList::Cons(
-                Expression::Atom(Rc::new("a".to_string())),
-                Rc::new(ExpressionList::Nil)
-            )
+            &ExpressionList::Cons(Expression::Atom("a"), Rc::new(ExpressionList::Nil))
         );
 
         // cons test
@@ -244,13 +248,13 @@ mod tests {
 
         // partial_eqの挙動をついでにテスト。rcの中身もちゃんと見ている様子。
         {
-            let t1 = Expression::Atom(Rc::new("abc".to_string()));
-            let t2 = Expression::Atom(Rc::new("abc".to_string()));
+            let t1 = Expression::Atom("abc");
+            let t2 = Expression::Atom("abc");
             assert_eq!(t1, t2);
         }
         {
-            let t1 = Expression::Atom(Rc::new("abc".to_string()));
-            let t2 = Expression::Atom(Rc::new("ab".to_string()));
+            let t1 = Expression::Atom("abc");
+            let t2 = Expression::Atom("ab");
             assert_ne!(t1, t2);
         }
     }
